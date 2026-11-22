@@ -55,51 +55,18 @@ install_reaper() {
   [ -e "$reaper_exe" ] || { echo "REAPER didn't install"; ls -d /c/Program\ Files*/REAPER* 2>&1; return 1; }
 }
 
-# REAPER's audio system ([audioconfig] mode) that is Dummy Audio: the runner has no sound card, and
-# without a running device the plugin doesn't process until a render starts, so a mode clicked in the
-# editor reaches REAPER's latency only then, a beat late. Found by audio_probe; empty probes for it.
-AUDIO_MODE=
-
-audio_config() { # mode
-  mkdir -p "$config"
-  printf '[audioconfig]\nmode=%s\ndummy_srate=%s\n' "$1" "$RATE" >"$config/REAPER.ini"
-}
-
-# Which mode number is Dummy Audio: REAPER says which audio system it opened for each.
-audio_probe() {
-  local mode i said
-  for mode in 0 1 2 3 4 5 6 7; do
-    rm -rf "$config"
-    audio_config "$mode"
-    mkdir -p "$config/Scripts"
-    cat >"$config/Scripts/__startup.lua" <<LUA
-local f = io.open([[$(native "$work")\\mode.txt]], "w")
-local ok, mode = reaper.GetAudioDeviceInfo("MODE")
-f:write(tostring(ok) .. " " .. tostring(mode) .. "\\n")
-f:close()
-reaper.Main_OnCommand(40004, 0)
-LUA
-    rm -f "$work/mode.txt"
-    env -u GH_TOKEN "$reaper_exe" -nosplash >/dev/null 2>&1 &
-    reaper_pid=$!
-    for i in $(seq 1 40); do
-      [ -s "$work/mode.txt" ] && break
-      dialogs >/dev/null
-      sleep 0.5
-    done
-    said=$(tr -d '\r' <"$work/mode.txt" 2>/dev/null || echo "(nothing)")
-    echo "audio mode $mode: $said"
-    stop_reaper
-    case "$said" in *ummy*) AUDIO_MODE=$mode; break ;; esac
-  done
-  [ -n "$AUDIO_MODE" ] || echo "::warning::no audio mode was Dummy Audio"
+# REAPER on Dummy Audio ([audioconfig] mode 4, found by starting REAPER with each mode and asking
+# GetAudioDeviceInfo("MODE")): the runner has no sound card, and without a running device the plugin
+# doesn't process until a render starts, so a mode clicked in the editor reached REAPER's latency only
+# then, and the bounce lost its first beat.
+audio_config() {
+  printf '[audioconfig]\nmode=4\ndummy_srate=%s\n' "$RATE" >"$config/REAPER.ini"
 }
 
 fresh_config() {
-  [ -n "$AUDIO_MODE" ] || audio_probe
   rm -rf "$config"
-  [ -z "$AUDIO_MODE" ] || audio_config "$AUDIO_MODE"
   mkdir -p "$config/Scripts"
+  audio_config
   cp "$here/host-test/host_test.lua" "$config/Scripts/__startup.lua"
 }
 
