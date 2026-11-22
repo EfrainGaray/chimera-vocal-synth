@@ -19,7 +19,9 @@ for tests and the `chimera` CLI.
    native speaker's check and must leave English unchanged.
 5. **The design language (the vector display) is settled**; the look within it can still evolve.
 6. **Nothing copyrighted in git**; MIT; a deterministic, real-time-safe engine.
-7. **Not now**: a DAW or sequencer, a light theme, multi-voice dialogue, translating the
+7. **The 3D head can be worn by a body** ([docs/rig.md](docs/rig.md)), for the videos people
+   make with the voice: a small library, not animation software (no timeline, no renderer).
+8. **Not now**: a DAW or sequencer, a light theme, multi-voice dialogue, translating the
    interface (the voice speaks and sings many languages; the labels stay in English).
 
 ## What it does
@@ -115,11 +117,13 @@ bun tools/musicxml-to-notes.ts score.mxl P1 --out p1.json   # a score's part →
 - [docs/turkish.md](docs/turkish.md): how Turkish text is read: k, g and l, ğ, stress.
 - [docs/hill-climb/](docs/hill-climb/): the rules and log for tuning the voice one measured
   step at a time.
+- [docs/rig.md](docs/rig.md): the body rig the 3D head can be worn on.
 
 Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md). Agents: see [AGENTS.md](AGENTS.md).
 
 ## License
 
 [MIT](LICENSE). Bundled third-party files keep their own licenses: the CMU Pronouncing
-Dictionary ([public/data/CMUDICT-LICENSE.txt](public/data/CMUDICT-LICENSE.txt)) and the fonts
-([public/fonts/](public/fonts/)).
+Dictionary ([public/data/CMUDICT-LICENSE.txt](public/data/CMUDICT-LICENSE.txt)), the fonts
+([public/fonts/](public/fonts/)) and the body rig's mesh (CC0, MakeHuman and MPFB2:
+[docs/rig.md](docs/rig.md#provenance)).
