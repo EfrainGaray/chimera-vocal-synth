@@ -60,8 +60,8 @@ struct WindowHost {
     webview: Weak<RefCell<Option<WebView>>>,
     /// the window's size and the pointer's place when the drag began (logical, y downwards)
     drag: Mutex<Option<((u32, u32), (f64, f64))>>,
-    /// the view size and the monitor's scale the page's zoom was set for; None until the page's first
-    /// poll, because WebView2 puts the zoom back to 1 when the page loads
+    /// the view size and the monitor's scale the page's zoom was set for; None from when the page
+    /// (re)loads until its next poll, because WebView2 puts the zoom back to 1 when a page loads
     zoomed_for: Mutex<Option<((u32, u32), u32)>>,
     /// polls until the view's size is taken as the window's
     settling: Mutex<u32>,
@@ -147,6 +147,9 @@ impl ParamHost for WindowHost {
         if let Some(webview) = webview.as_ref() {
             platform::edit(webview, action);
         }
+    }
+    fn page_loaded(&self) {
+        *self.zoomed_for.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
     /// The page's zoom follows the host's view, whichever way that came to change, and once the
     /// grip has settled the view's size is the window's: a host may have refused or clamped it.
