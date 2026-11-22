@@ -458,6 +458,14 @@ and installs into `~/Library/Audio/Plug-Ins` or `~/.clap` and `~/.vst3`, so it n
 `curl` doesn't quarantine what it downloads; the bundles are notarised for a browser's download.
 `install-test.sh` runs it on CI on both systems, against each build's own archive served as `file://`.
 
+Windows isn't in a release yet. Its CI job makes `CHIMERA-windows.zip` (`windows/build.sh --package`): a
+`CHIMERA` folder with the CLAP, the VST3 bundle, the licences, `How to install.txt`, and `Install
+CHIMERA.cmd` and `Uninstall CHIMERA.cmd`, which run `install.ps1`. It installs into Common Files\CLAP
+and Common Files\VST3, where every Windows DAW looks, after asking for an administrator once; per-user
+folders would need none, but not every DAW scans them. `windows/ci.sh` runs it from the zip, twice, and
+the host test plays what it installed. For testers, the zip goes in a pre-release, which
+`releases/latest` skips.
+
 The Linux build is made on Ubuntu 22.04, so it needs glibc 2.35 at most: built on a newer system, the
 VST3 SDK's C++ calls glibc 2.38's `__isoc23_sscanf`, which Ubuntu 22.04 and Debian 12 lack. `linux/ci.sh`
 fails a build that needs a newer glibc than the 2.35 the release promises. When GitHub retires its
