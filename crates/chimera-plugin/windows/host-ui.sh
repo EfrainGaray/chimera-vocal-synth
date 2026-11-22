@@ -62,6 +62,7 @@ fresh_config() {
 }
 
 start_reaper() {
+  ui clear || true
   env -u GH_TOKEN "$reaper_exe" -nosplash >>"$out/reaper.log" 2>&1 &
   reaper_pid=$!
 }

@@ -1,6 +1,6 @@
 # The screen, REAPER's windows and dialogs, and the mouse, for ../host-test/run.sh on Windows.
 #   ui.ps1 screen | shot <file.jpg> | bounds | click <x> <y> | drag <x1> <y1> <x2> <y2>
-#          | dialogs | nag | front | windows
+#          | dialogs | nag | front | windows | clear
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 Add-Type @"
@@ -136,6 +136,12 @@ switch ($command) {
   }
   'nag' {
     foreach ($h in Tops) { if ([W]::Text($h) -like 'About REAPER*') { 'open'; return } }
+  }
+  # the runner's own console window can come up over a REAPER started later, which Windows won't
+  # let take the foreground from it: minimize everything first
+  'clear' {
+    (New-Object -ComObject Shell.Application).MinimizeAll()
+    Start-Sleep -Milliseconds 500
   }
   'windows' {
     foreach ($h in Tops) { "$([W]::Class($h)) | $([W]::Text($h))" }
