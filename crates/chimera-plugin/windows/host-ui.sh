@@ -43,12 +43,16 @@ install_reaper() {
   curl -fsSL -o "$work/reaper-install.exe" "https://www.reaper.fm/files/7.x/reaper${reaper_version}_x64-install.exe"
   echo "$reaper_sha  $work/reaper-install.exe" | sha256sum -c -
   # Git Bash would turn /S into a path, and the installer would wait for someone to click through it
-  MSYS_NO_PATHCONV=1 "$work/reaper-install.exe" /S
+  # It exits 1223 (ERROR_CANCELLED; bash sees 199) even when it installed, so whether reaper.exe is
+  # there is the test.
+  local code=0
+  MSYS_NO_PATHCONV=1 "$work/reaper-install.exe" /S || code=$?
+  echo "REAPER's installer exited $code"
   for _ in $(seq 1 60); do
     [ -e "$reaper_exe" ] && break
     sleep 1
   done
-  [ -e "$reaper_exe" ] || { echo "REAPER didn't install"; return 1; }
+  [ -e "$reaper_exe" ] || { echo "REAPER didn't install"; ls -d /c/Program\ Files*/REAPER* 2>&1; return 1; }
 }
 
 fresh_config() {
