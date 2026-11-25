@@ -7,7 +7,7 @@
 use crate::airway::network::{AirwayNetwork, Area, NoiseSpec, PortSpec, Tube, TubeSpec};
 use crate::anatomy::human::{HumanArtic, HumanBody, HumanFrame, HumanVocalTract};
 use crate::math::{PI, exp, js_max, js_min, js_round, smoothstep as smooth, sqrt};
-use crate::physics::{C_SOUND, CM_H2O, RHO, WALL_NASAL, WALL_SOFT, WALL_TRACHEA};
+use crate::physics::{C_SOUND, CM_H2O, RHO, WALL_NASAL, WALL_SOFT, WALL_TRACHEA, WallParams};
 
 /// The teeth source's band tops out at f = St·u/δ, the jet's speed and eddy size where it meets the
 /// teeth. St is of order 1 for a near-circular jet such as /s/ or /ʃ/ (Krane 2005, JASA 118, eq. 13),
@@ -111,6 +111,8 @@ impl HumanAirway {
         let k = body.scale;
         let tract = HumanVocalTract::new(body);
         let mut net = AirwayNetwork::new(fs);
+        net.viscous_scale = body.viscous;
+        let soft = WallParams { resistance: WALL_SOFT.resistance * body.wall_loss, ..WALL_SOFT };
         let dx_min = (C_SOUND / fs) / 0.93;
         // node counts from the shortest expected lengths (larynx raised, lips retracted)
         let ph_min_len = 8.7 * k * (0.55 + 0.45 * body.pharynx) - 1.6 * k;
@@ -120,8 +122,8 @@ impl HumanAirway {
 
         let tr_len = 12.0 * k;
         let trachea = net.add_tube(TubeSpec::new("trachea", js_max(6.0, (tr_len / js_max(dx_min, 0.9 * k)).floor()) as usize, tr_len, Area::Uniform(2.5 * k * k)).wall(Some(WALL_TRACHEA)));
-        let pharynx = net.add_tube(TubeSpec::new("pharynx", n_ph, 8.8 * k, Area::Uniform(3.0 * k * k)).wall(Some(WALL_SOFT)).radiating(0.25).perimeter(1.25));
-        let oral = net.add_tube(TubeSpec::new("oral", n_or, 8.3 * k, Area::Uniform(3.0 * k * k)).wall(Some(WALL_SOFT)).radiating(0.25).perimeter(1.5));
+        let pharynx = net.add_tube(TubeSpec::new("pharynx", n_ph, 8.8 * k, Area::Uniform(3.0 * k * k)).wall(Some(soft)).radiating(body.radiation).perimeter(1.25));
+        let oral = net.add_tube(TubeSpec::new("oral", n_or, 8.3 * k, Area::Uniform(3.0 * k * k)).wall(Some(soft)).radiating(body.radiation).perimeter(1.5));
         let na_len = 11.4 * k;
         let n_na = js_max(8.0, (na_len / js_max(dx_min, 0.5 * k)).floor()) as usize;
         let na_areas: Vec<f64> = (0..n_na)
@@ -143,7 +145,7 @@ impl HumanAirway {
         // three sections where they fit the time step: a child's 1.5 cm fossa in a 64 kHz airway
         // (a 16 or 32 kHz device) had 0.49 cm sections, Courant number 1.09, and the voice rang 3x loud
         let n_fo = js_max(1.0, js_min(3.0, (2.0 * k / dx_min).floor())) as usize;
-        let fossa = net.add_tube(TubeSpec::new("piriform", n_fo, 2.0 * k, Area::Uniform(0.9 * k * k)).wall(Some(WALL_SOFT)).perimeter(1.3));
+        let fossa = net.add_tube(TubeSpec::new("piriform", n_fo, 2.0 * k, Area::Uniform(0.9 * k * k)).wall(Some(soft)).perimeter(1.3));
 
         let lungs = net.add_pressure_node("lungs");
         let tr_a = 2.5 * k * k;

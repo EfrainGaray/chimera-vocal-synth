@@ -291,11 +291,19 @@ pub struct HumanBody {
     /// 1990), which is where their 5.7 dB higher H1-H2 comes from (Klatt & Klatt 1990). A child's is
     /// taken to be a woman's, unsourced.
     pub chink: f64,
+    /// multiplier on the soft walls' resistance (pharynx, oral cavity, piriform fossa; 1 = Ishizaka,
+    /// French & Flanagan 1975). Tract losses set the formant bandwidths: too little and the
+    /// tract rings.
+    pub wall_loss: f64,
+    /// multiplier on the viscous (boundary-layer) loss of every tube (1 = the physics).
+    pub viscous: f64,
+    /// how much of the soft walls' vibration radiates out through the neck and cheeks (0.25).
+    pub radiation: f64,
 }
 
-pub const BODY_MALE: HumanBody = HumanBody { name: "Adult male", scale: 1.0, pharynx: 1.0, tongue_radius: 2.25, lip_width: 4.6, fold_length: 1.0, open_phase: 0.0, chink: 0.0195 };
-pub const BODY_FEMALE: HumanBody = HumanBody { name: "Adult female", scale: 0.9, pharynx: 0.88, tongue_radius: 2.2, lip_width: 4.4, fold_length: 0.67, open_phase: 0.13, chink: 0.0153 };
-pub const BODY_CHILD: HumanBody = HumanBody { name: "Child", scale: 0.74, pharynx: 0.8, tongue_radius: 2.15, lip_width: 4.0, fold_length: 0.35, open_phase: 0.13, chink: 0.0153 };
+pub const BODY_MALE: HumanBody = HumanBody { name: "Adult male", scale: 1.0, pharynx: 1.0, tongue_radius: 2.25, lip_width: 4.6, fold_length: 1.0, open_phase: 0.0, chink: 0.0195, wall_loss: 1.0, viscous: 1.0, radiation: 0.25 };
+pub const BODY_FEMALE: HumanBody = HumanBody { name: "Adult female", scale: 0.9, pharynx: 0.88, tongue_radius: 2.2, lip_width: 4.4, fold_length: 0.67, open_phase: 0.13, chink: 0.0153, wall_loss: 1.0, viscous: 1.0, radiation: 0.25 };
+pub const BODY_CHILD: HumanBody = HumanBody { name: "Child", scale: 0.74, pharynx: 0.8, tongue_radius: 2.15, lip_width: 4.0, fold_length: 0.35, open_phase: 0.13, chink: 0.0153, wall_loss: 1.0, viscous: 1.0, radiation: 0.25 };
 
 /// The three human bodies by their short names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -400,6 +408,9 @@ impl BodyMix {
             fold_length: self.blend(|b| b.body().fold_length),
             open_phase: self.blend(|b| b.body().open_phase),
             chink: self.blend(|b| b.body().chink),
+            wall_loss: self.blend(|b| b.body().wall_loss),
+            viscous: self.blend(|b| b.body().viscous),
+            radiation: self.blend(|b| b.body().radiation),
         }
     }
 }

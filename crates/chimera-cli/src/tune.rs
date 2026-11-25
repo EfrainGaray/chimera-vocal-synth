@@ -58,6 +58,9 @@ impl Tune {
         if let Some(x) = g("fold_length") { b.fold_length = x; }
         if let Some(x) = g("open_phase") { b.open_phase = x; }
         if let Some(x) = g("chink") { b.chink = x; }
+        if let Some(x) = g("wall_loss") { b.wall_loss = x; }
+        if let Some(x) = g("viscous") { b.viscous = x; }
+        if let Some(x) = g("radiation") { b.radiation = x; }
         b
     }
 }
@@ -66,7 +69,7 @@ const KEYS: &[&str] = &[
     "source.f0", "source.glide", "source.pressure", "source.breathiness", "source.tension", "source.fry",
     "source.roughness", "source.vibrato_depth", "source.vibrato_rate", "source.drift", "source.brightness",
     "body.scale", "body.pharynx", "body.tongue_radius", "body.lip_width", "body.fold_length", "body.open_phase",
-    "body.chink", "plan.accent", "plan.rate", "song.vibrato",
+    "body.chink", "body.wall_loss", "body.viscous", "body.radiation", "plan.accent", "plan.rate", "song.vibrato",
 ];
 
 #[cfg(test)]
