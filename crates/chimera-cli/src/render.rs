@@ -121,6 +121,9 @@ pub fn speech(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     };
     let mut voice = HumanVoice::new(FS, b, 2);
     voice.set_source(&SourcePatch::f0(f0));
+    if ctx.whisper {
+        voice.set_source(&SourcePatch::whisper());
+    }
     let mut marks: Vec<(f64, String)> = Vec::new();
     let mut t0 = 0.05;
     // what the engine will not say as typed, one warning line per kind on stderr (the render is unchanged)
@@ -184,6 +187,11 @@ pub fn say(g: &EnglishG2P, text: &str, body_name: &str) -> Result<Spoken, String
 
 /// Say phrases from any G2P the way `render text` does (see [`say`]).
 pub fn say_phrases(phrases: &[Phrase], body_name: &str) -> Result<Spoken, String> {
+    say_phrases_in(phrases, body_name, false)
+}
+
+/// [`say_phrases`], whispered when `whisper`.
+pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Result<Spoken, String> {
     let b = body(body_name)?;
     let f0 = text_f0(body_name);
     let shown: Vec<String> = phrases
@@ -203,6 +211,9 @@ pub fn say_phrases(phrases: &[Phrase], body_name: &str) -> Result<Spoken, String
         .collect();
     let mut voice = HumanVoice::new(FS, b, 2);
     voice.set_source(&SourcePatch::f0(f0));
+    if whisper {
+        voice.set_source(&SourcePatch::whisper());
+    }
     let inputs: Vec<PhraseInput> = phrases
         .iter()
         .map(|p| PhraseInput {
@@ -234,7 +245,7 @@ pub fn text(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     let body_name = arg(a, 2, "male");
     let g = g2p()?;
     let t = Instant::now();
-    let s = say(&g, text, body_name)?;
+    let s = say_phrases_in(&g.to_phrases(text), body_name, ctx.whisper)?;
     let ms = ms_since(t);
     println!("{}", s.shown);
     let file = wav_name(name);
@@ -253,7 +264,7 @@ pub fn turkish(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     let name = arg(a, 0, "out/turkish");
     let text = arg(a, 1, "Merhaba, nasılsın?");
     let body_name = arg(a, 2, "male");
-    let s = say_phrases(&turkish::to_phrases(text), body_name)?;
+    let s = say_phrases_in(&turkish::to_phrases(text), body_name, ctx.whisper)?;
     println!("{}", s.shown);
     let file = wav_name(name);
     ctx.write_wav(&file, &s.out)?;
@@ -860,6 +871,9 @@ pub fn vowels(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     };
     let mut voice = HumanVoice::new(FS, b, 2);
     voice.set_source(&SourcePatch::f0(f0));
+    if ctx.whisper {
+        voice.set_source(&SourcePatch::whisper());
+    }
     let list = ["i", "e", "ɛ", "æ", "ɑ", "ɔ", "o", "u", "ʌ", "ɝ"];
     let seg = 0.6;
     let mut out = vec![0f32; js_round(FS * seg * list.len() as f64) as usize];

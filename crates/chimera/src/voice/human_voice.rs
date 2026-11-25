@@ -91,6 +91,11 @@ impl SourcePatch {
     pub fn f0(f0: f64) -> Self {
         SourcePatch { f0: Some(f0), ..Default::default() }
     }
+    /// A whisper: the folds held apart and still, so the only source is the turbulence of the air
+    /// through the open glottis, with a little more lung pressure to make it audible.
+    pub fn whisper() -> Self {
+        SourcePatch { voiced: Some(false), breathiness: Some(0.9), pressure: Some(8.5), ..Default::default() }
+    }
     /// `Object.assign(source, patch)`
     pub fn apply(&self, s: &mut VoiceSource) {
         macro_rules! set {

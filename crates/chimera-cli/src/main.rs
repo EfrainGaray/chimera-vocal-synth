@@ -15,7 +15,7 @@ use chimera::phonetics::syllables::Lang;
 use std::process::ExitCode;
 
 const USAGE: &str = "\
-usage: chimera <command> [args] [--float]
+usage: chimera <command> [args] [--float] [--whisper]
 
   render speech  <out> [\"ipa / ipa\"] [male|female|child]
   render text    <out> [\"English text.\"] [male|female|child]
@@ -39,6 +39,8 @@ usage: chimera <command> [args] [--float]
   calibrate consonants [--out file]
 
 Output names are stems (<out>.wav). --float writes 32-bit float WAVs instead of 16-bit PCM.
+--whisper says render speech, text, turkish and vowels in the whispered voice (no fold
+vibration: turbulence at an open glottis).
 Calibration writes the tables the engine embeds, in crates/chimera/src/phonetics/.";
 
 /// The output rate of every render.
@@ -53,6 +55,8 @@ pub fn repo_path(rel: &str) -> String {
 pub struct Ctx {
     /// write 32-bit float WAVs
     pub float: bool,
+    /// speak in the whispered voice
+    pub whisper: bool,
 }
 
 impl Ctx {
@@ -98,8 +102,9 @@ pub fn arg<'a>(a: &'a [String], i: usize, default: &'a str) -> &'a str {
 
 fn run(args: Vec<String>) -> Result<(), String> {
     let float = args.iter().any(|a| a == "--float");
-    let args: Vec<String> = args.into_iter().filter(|a| a != "--float").collect();
-    let ctx = Ctx { float };
+    let whisper = args.iter().any(|a| a == "--whisper");
+    let args: Vec<String> = args.into_iter().filter(|a| a != "--float" && a != "--whisper").collect();
+    let ctx = Ctx { float, whisper };
     let cmd: Vec<&str> = args.iter().take(2).map(String::as_str).collect();
     match cmd.as_slice() {
         ["render", kind, ..] => {
