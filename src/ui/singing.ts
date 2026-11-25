@@ -135,15 +135,17 @@ export const useSing = create<SingState>((set, get) => ({
     if (inPlugin) setParam("vibrato", cents);
   },
   setTune: (id) => {
-    const words = TUNES.find((t) => t.id === id)?.lyrics;
+    const tune = TUNES.find((t) => t.id === id);
+    const words = tune?.lyrics;
+    const wordsLang = tune?.lang ?? "en";
     const { lyrics, lang } = get();
     const asWritten = TUNES.some((t) => t.lyrics === lyrics);
     if (words !== undefined) {
       // a demo song brings its words, in English or a script of its own; the player's own words
       // and language come back with a mood
       if (!asWritten) ownWords = { lyrics, lang };
-      if (lyrics !== words || lang !== "en") {
-        set({ lang: "en" });
+      if (lyrics !== words || lang !== wordsLang) {
+        set({ lang: wordsLang });
         get().setLyrics(words);
       }
     } else if (asWritten && ownWords !== null) {

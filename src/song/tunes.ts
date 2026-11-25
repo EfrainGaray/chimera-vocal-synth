@@ -16,6 +16,8 @@ export interface Tune {
   phrases: [number, number][][];
   /** a demo song's own words: choosing it puts them in the lyrics, and Sing sings them a syllable to a note */
   lyrics?: string;
+  /** the language its words are read in (default English) */
+  lang?: "en" | "tr" | "es";
 }
 
 /** the demo songs the moods take their melodies from */
@@ -88,6 +90,42 @@ const MOODS: Tune[] = [
   fromDemo("twinkle", "Twinkle, twinkle", "Twinkle, twinkle", [7, 7]),
 ];
 
+/** Spanish songs with their own words: a traditional one and one written for this instrument. */
+const SPANISH: Tune[] = [
+  {
+    id: "es:cucaracha",
+    name: "La cucaracha",
+    bpm: 150,
+    octave: { male: -1, female: 0, child: 0 },
+    lang: "es",
+    lyrics: "La cucaracha, la cucaracha, ya no puede caminar, porque no tiene, porque le falta, las dos patitas de atrás.",
+    phrases: [
+      [[60, 0.5], [60, 0.5], [60, 0.5], [65, 1.5], [69, 3]],
+      [[60, 0.5], [60, 0.5], [60, 0.5], [65, 1.5], [69, 3]],
+      [[65, 0.5], [65, 0.5], [64, 0.5], [64, 0.5], [62, 0.5], [62, 0.5], [60, 3]],
+      [[60, 0.5], [60, 0.5], [60, 0.5], [64, 1.5], [67, 3]],
+      [[60, 0.5], [60, 0.5], [60, 0.5], [64, 1.5], [67, 3]],
+      [[72, 0.5], [74, 0.5], [72, 0.5], [70, 0.5], [69, 0.5], [67, 0.25], [67, 0.25], [65, 3]],
+    ],
+  },
+  {
+    id: "es:salta",
+    name: "Salta salta",
+    bpm: 132,
+    octave: { male: -1, female: 0, child: 0 },
+    lang: "es",
+    lyrics: "Salta salta sin parar, mueve el pie y a bailar, uno dos y tres y va, la ciudad se va a encender, nadie quiere ya volver, toda la noche hasta el amanecer.",
+    phrases: [
+      [[69, 0.5], [69, 0.5], [72, 0.25], [69, 0.5], [74, 0.5], [72, 0.5], [69, 4.25]],
+      [[72, 0.5], [72, 0.5], [74, 0.25], [76, 0.5], [74, 0.5], [72, 0.5], [69, 0.5], [72, 3.75]],
+      [[76, 0.5], [76, 0.5], [74, 0.25], [72, 0.5], [74, 0.5], [76, 0.5], [69, 4.25]],
+      [[69, 0.5], [72, 0.5], [74, 0.25], [76, 0.5], [76, 0.5], [74, 0.5], [72, 0.5], [74, 0.5], [76, 3.25]],
+      [[79, 0.5], [76, 0.5], [74, 0.25], [72, 0.5], [74, 0.5], [72, 0.5], [69, 0.5], [72, 3.75]],
+      [[69, 0.5], [72, 0.5], [74, 0.25], [76, 0.5], [79, 0.5], [76, 0.5], [74, 0.5], [72, 0.5], [74, 0.5], [72, 0.5], [69, 2.25]],
+    ],
+  },
+];
+
 /** every other demo song as written: one phrase, its own words (a song added to the engine's catalog shows up here) */
 const SONGS: Tune[] = DEMO_SONGS.filter((d) => !borrowed.has(d.name)).map((d) => ({
   id: `song:${d.name}`,
@@ -98,4 +136,4 @@ const SONGS: Tune[] = DEMO_SONGS.filter((d) => !borrowed.has(d.name)).map((d) =>
   lyrics: d.lyrics,
 }));
 
-export const TUNES: readonly Tune[] = [...MOODS, ...SONGS];
+export const TUNES: readonly Tune[] = [...MOODS, ...SPANISH, ...SONGS];

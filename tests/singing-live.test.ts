@@ -275,7 +275,7 @@ describe("Sing mode, live keys", () => {
     expect(sing().syllables.map((s) => s.text)).toEqual(["çok", "gü", "zel"]);
     stopSinging();
     // a demo song in English brings its words, read as English
-    const song = TUNES.find((t) => t.lyrics !== undefined && /^[ -~\s]*$/.test(t.lyrics))!;
+    const song = TUNES.find((t) => t.lyrics !== undefined && t.lang === undefined && /^[ -~\s]*$/.test(t.lyrics))!;
     sing().setTune(song.id);
     expect(sing().lang).toBe("en");
     expect(sing().lyrics).toBe(song.lyrics!);
