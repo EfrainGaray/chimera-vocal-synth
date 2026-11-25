@@ -311,6 +311,20 @@ struct Seg<'a> {
 
 /// glottal abduction of breathy voice: /ɦ/'s, a gap the folds still vibrate across
 const BREATHY_ABDUCTION: f64 = 0.1;
+
+/// A consonant's mark on the pitch next to it: a tenth up after a voiceless obstruent, a tenth
+/// down through a voiced one (Birkholz & Zhang 2020, 11.1 and 10.75 Hz on a 100 Hz voice).
+const MICRO_PITCH: f64 = 1.1;
+
+/// A vowel's intrinsic pitch: high vowels are spoken higher than low ones, in every language
+/// measured, by 5 to 20 Hz (Whalen & Levitt 1995), here a semitone between [i u] and [a].
+fn intrinsic_pitch(ipa: &str) -> f64 {
+    match ipa.chars().next() {
+        Some('i' | 'ɪ' | 'u' | 'ʊ' | 'y' | 'ɯ') => 1.03,
+        Some('a' | 'ɑ' | 'æ' | 'ɒ') => 0.975,
+        _ => 1.0,
+    }
+}
 /// how long past its release a breathy-voiced stop's folds stay apart (s), at most to the end of
 /// the next segment
 const BREATHY_RELEASE: f64 = 0.08;
@@ -697,6 +711,9 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
     }
     // a late peak (Hz) the stressed vowel before handed to this one
     let mut carried: Option<f64> = None;
+    // each vowel's pitch (Hz) as it starts, for the consonants' marks on it below
+    let mut pitch_of: SmallVec<[f64; INLINE_SEGMENTS]> = SmallVec::new();
+    pitch_of.resize(v_idx.len(), f0);
     for (n, &i) in v_idx.iter().enumerate() {
         let s = &segs[i];
         let Span { t0, t1 } = times[i];
@@ -707,18 +724,23 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
         let has_f0 = truthy(s.f0);
         if has_f0 {
             target = s.f0.unwrap();
+            pitch_of[n] = target;
         } else {
             let prog = (t0 - o.t0) / total;
             let decl = 1.0 - declination * prog;
             let is_nuclear = i as isize == nuclear;
             let acc = if s.stress == Some(1) {
-                1.0 + (if is_nuclear { accent * 1.8 } else { accent })
+                // a tuned language's nuclear accent is no bigger than the prenuclear ones (Spanish
+                // steps its peaks down to the last, Prieto, Shih & Nibert 1996); the planner's own
+                // tune makes it the phrase's biggest
+                1.0 + (if is_nuclear && o.tune.is_none() { accent * 1.8 } else { accent })
             } else if s.stress == Some(2) {
                 1.0 + accent * 0.5
             } else {
                 1.0
             };
-            target = f0 * decl * acc;
+            target = f0 * decl * acc * intrinsic_pitch(s.ipa);
+            pitch_of[n] = target;
             let last = n == v_idx.len() - 1;
             // a prenuclear accent that peaks late: the pitch rises from the base over the second
             // half of the stressed vowel and the consonants after it, and the unstressed vowel
@@ -733,6 +755,7 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
             }
             if let Some(peak) = peak_here {
                 target = peak;
+                pitch_of[n] = target;
             }
             if last && o.intonation == Some(Intonation::Question) {
                 target = f0 * 1.35;
@@ -754,6 +777,39 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
         }
         let r = if has_f0 && sung { pitch_ramp(t1 - t0) } else { 0.06 };
         gestures.push(Gesture::new(t0, if has_f0 { t1 } else { hold }, r, r, if has_f0 { 6.0 } else { 1.0 }, one(ControlKey::F0, target)).label("pitch"));
+    }
+    // ---- microprosody: the consonants' marks on a spoken pitch (a sung note keeps its pitch).
+    // Modelled on a 1683-sentence corpus by Birkholz & Zhang (ICASSP 2020): after a voiceless
+    // obstruent the vowel starts about a tenth higher (11.1 Hz on a 100 Hz voice) and is back on
+    // its target within 30-40 ms (Hombert, Ohala & Ewan 1979); through a voiced obstruent the pitch
+    // dips by about as much, deepest past the middle of the consonant. The marks are 1-2 semitones
+    // and blend with the vowel's own target, so they come out at about half that.
+    let obstruent = |d: &PhonemeDef| matches!(d.manner, Manner::Stop | Manner::Affricate | Manner::Fricative);
+    for (n, &i) in v_idx.iter().enumerate() {
+        if truthy(segs[i].f0) || segs[i].glide_from {
+            continue;
+        }
+        let Span { t0, .. } = times[i];
+        let pitch = pitch_of[n];
+        let prev = if i > 0 { segs[i - 1].def.as_ref() } else { None };
+        if prev.is_some_and(|d| obstruent(d) && d.voicing == Voicing::Voiceless) {
+            gestures.push(Gesture::new(t0 - 0.01, t0 + 0.025, 0.015, 0.03, 2.0, one(ControlKey::F0, pitch * MICRO_PITCH)).label("pitch"));
+        }
+        if let Some(&next_v) = v_idx.get(n + 1) {
+            if truthy(segs[next_v].f0) {
+                continue;
+            }
+            // the voiced obstruents between this vowel and the next, as one span
+            let between = (i + 1..next_v).filter(|&c| segs[c].def.as_ref().is_some_and(|d| obstruent(d) && d.voicing == Voicing::Voiced));
+            let (mut c0, mut c1) = (f64::INFINITY, f64::NEG_INFINITY);
+            for c in between {
+                c0 = js_min(c0, times[c].t0);
+                c1 = js_max(c1, times[c].t1);
+            }
+            if c1 > c0 {
+                gestures.push(Gesture::new(c0 - 0.02, c1 + 0.01, 0.03, 0.03, 1.5, one(ControlKey::F0, pitch / MICRO_PITCH)).label("pitch"));
+            }
+        }
     }
     // sung: a consonant given its note's pitch holds it, so the pitch moves during an onset
     // consonant and has arrived when the vowel starts

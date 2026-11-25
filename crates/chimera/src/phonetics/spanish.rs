@@ -45,7 +45,9 @@ const UNSTRESSED_LENGTH: f64 = 1.05;
 /// semitones between his 5th and 95th percentiles and falls 3-6 semitones over a short phrase;
 /// the planner's defaults (accent 0.14, declination 0.1) gave 6.3 semitones and under 1;
 /// 0.18 and 0.2 gave 7.1.
-pub const TUNE: Tune = Tune { accent: 0.2, declination: 0.2, late_peak: true };
+/// 0.35 brings the read story to 8.0 semitones between its 5th and 95th percentiles (6.8 at 0.2 and
+/// at 0.25): the voice realises about half of a planned accent, whatever the pitch ramps (40 or 60 ms).
+pub const TUNE: Tune = Tune { accent: 0.35, declination: 0.2, late_peak: true };
 /// Pauses (s) after a phrase that goes on (a comma) and after a sentence. Read Spanish pauses
 /// about 250 ms at a comma and 500-700 ms at a full stop (the LibriVox reader: 560 ms on average).
 const PAUSE_CONTINUATION: f64 = 0.25;
