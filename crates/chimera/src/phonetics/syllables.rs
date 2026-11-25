@@ -18,6 +18,7 @@ use super::japanese::Japanese;
 use super::korean::Korean;
 use super::mandarin::{Mandarin, MandarinLexicon, Pinyin};
 use super::russian::Russian;
+use super::spanish::Spanish;
 use super::turkish::Turkish;
 use super::planner::is_vowel;
 use super::{Segment, Syllable};
@@ -330,13 +331,14 @@ pub fn lyrics_to_syllables_with(text: &str, g2p: &impl WordSource, zh: &Mandarin
 }
 
 /// The language Latin-script lyrics are in. The router tells languages apart by script, which
-/// can't tell Turkish from English, so the player chooses; other scripts are routed as usual.
+/// can't tell Turkish or Spanish from English, so the player chooses; other scripts are routed as usual.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Lang {
     #[default]
     En,
     Tr,
+    Es,
 }
 
 /// Lyrics → sung syllables through every built-in front end, with Latin script read as `lang`:
@@ -348,5 +350,8 @@ pub fn lyrics_in(text: &str, g2p: &impl WordSource, zh: &MandarinLexicon, lang: 
     match lang {
         Lang::En => read_lyrics(text, &[&Pinyin, &English(g2p), &Korean, &Russian, &Japanese, &Mandarin(zh)]),
         Lang::Tr => read_lyrics(text, &[&Pinyin, &Turkish, &Korean, &Russian, &Japanese, &Mandarin(zh)]),
+        // Spanish before pinyin: its accented words are often real toned pinyin too ("sí", "tú",
+        // "té", "mí"), so in Spanish, Latin script is Spanish's
+        Lang::Es => read_lyrics(text, &[&Spanish, &Korean, &Russian, &Japanese, &Mandarin(zh)]),
     }
 }

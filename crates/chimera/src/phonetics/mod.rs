@@ -17,6 +17,7 @@ pub mod planner;
 pub mod russian;
 pub mod sing;
 pub mod songs;
+pub mod spanish;
 pub mod syllables;
 pub mod turkish;
 pub mod vowel_data;
@@ -84,6 +85,9 @@ pub enum Intonation {
     /// final rise
     Question,
     Flat,
+    /// a phrase that goes on (a list item, a clause before the main one): a moderate final rise
+    /// instead of the fall (Spanish's continuation rise)
+    Continuation,
 }
 
 /// A segment as the planner timed it.

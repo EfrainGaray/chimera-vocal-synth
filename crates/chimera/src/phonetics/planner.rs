@@ -687,6 +687,11 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
             if last && o.intonation == Some(Intonation::Question) {
                 target = f0 * 1.35;
             }
+            // a phrase that goes on rises less, to about the nuclear accent's height (a speaker's
+            // continuation rise is 2-4 semitones over the base; Navarro Tomás 1944)
+            if last && o.intonation == Some(Intonation::Continuation) {
+                target = f0 * 1.25;
+            }
             if last && o.intonation.unwrap_or(Intonation::Statement) == Intonation::Statement {
                 if is_nuclear && t1 - t0 > 0.08 {
                     // accent peak early in the vowel, then the fall within it

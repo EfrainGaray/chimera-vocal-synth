@@ -199,13 +199,13 @@ export interface Plan {
   end: number;
 }
 
-/** The language Latin-script words are read in: their script can't tell Turkish from English, so
+/** The language Latin-script words are read in: their script can't tell Turkish or Spanish from English, so
  *  the player chooses (Rust's `syllables::Lang`). Hangul and Cyrillic go to their own front ends. */
-export type Lang = "en" | "tr";
+export type Lang = "en" | "tr" | "es";
 
 export interface Phrase {
   segments: Segment[];
-  intonation: "statement" | "question";
+  intonation: "statement" | "question" | "continuation";
   /** pause after the phrase (s) */
   pause: number;
   words: string[];

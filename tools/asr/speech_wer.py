@@ -115,4 +115,5 @@ def main():
               f"better from -{MARGIN}, worse past +{SLACK}{held})")
 
 
-main()
+if __name__ == "__main__":
+    main()

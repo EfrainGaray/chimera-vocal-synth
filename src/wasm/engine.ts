@@ -154,7 +154,7 @@ export class MandarinLexicon {
 
 /**
  * Lyrics → sung syllables through the built-in front ends: pinyin, the Latin-script language
- * (`lang`: English through the page's dictionary, see EnglishG2P, or Turkish), Korean, Russian,
+ * (`lang`: English through the page's dictionary, see EnglishG2P, Turkish or Spanish), Korean, Russian,
  * and Mandarin once its lexicon is loaded.
  */
 export function lyricsToSyllables(text: string, lang: Lang = "en"): Syllable[] {
@@ -169,6 +169,13 @@ export function turkishPhrases(text: string): Phrase[] {
   return call("trPhrases", { text });
 }
 
+/**
+ * Spanish text → phrases of segments, by spelling rules too (crates/chimera/src/phonetics/spanish.rs).
+ */
+export function spanishPhrases(text: string): Phrase[] {
+  return call("esPhrases", { text });
+}
+
 // ------------------------------------------------------------------ planning
 
 export interface PlanOptions {
@@ -179,7 +186,7 @@ export interface PlanOptions {
   rate?: number;
   /** baseline pitch (Hz) */
   f0?: number;
-  intonation?: "statement" | "question" | "flat";
+  intonation?: "statement" | "question" | "flat" | "continuation";
   /** pitch excursion for stressed syllables (fraction) */
   accent?: number;
   /** the last segment is held open-ended (a sung note): no end-of-breath release */
@@ -198,7 +205,7 @@ export function plannedCounts(ipa: string[]): number[] {
   return call("plannedCounts", { ipa });
 }
 
-export function planPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat"; pause?: number }[], options: PlanOptions): Plan {
+export function planPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat" | "continuation"; pause?: number }[], options: PlanOptions): Plan {
   return call("planPhrases", { phrases: phrases.map((p) => ({ segments: p.segments, intonation: p.intonation, pause: p.pause })), options });
 }
 

@@ -8,7 +8,7 @@ import type { BeatStep, BodyMix } from "../wasm/types.ts";
 
 export interface PhraseMsg {
   segments: Segment[];
-  intonation?: "statement" | "question" | "flat";
+  intonation?: "statement" | "question" | "flat" | "continuation";
   pause?: number;
 }
 
