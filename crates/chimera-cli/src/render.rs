@@ -642,7 +642,7 @@ pub fn notes(ctx: &Ctx, a: &[String]) -> Result<(), String> {
         if phrase.is_empty() {
             return;
         }
-        let plan = plan_song(phrase, &SongOptions { body: body_name.into(), bpm, t0: start, vibrato, ..Default::default() });
+        let plan = plan_song(phrase, &SongOptions { body: body_name.into(), bpm, t0: start, vibrato, consonants: ctx.tune.get("song.consonants"), ..Default::default() });
         v.schedule(&plan.gestures);
         *end = js_max(*end, plan.end);
         phrase.clear();

@@ -142,6 +142,15 @@ pub struct SongOptions {
     pub t0: f64,
     /// vibrato depth (cents) on held vowels
     pub vibrato: f64,
+    /// sung consonants' length as a multiple of the spoken one (None: 0.8, a little shorter, as
+    /// singers do; a voice converter that reads the short sung /t/ of "faltan" as /l/ wants more)
+    #[serde(default)]
+    pub consonants: Option<f64>,
+}
+
+/// The sung consonants' length multiple (`SongOptions::consonants`), 0.8 unless set.
+fn consonant_k(o: &SongOptions) -> f64 {
+    o.consonants.unwrap_or(0.8)
 }
 
 /// A bend's blending strength against the note's own pitch (6): it wins while it lasts.
@@ -234,7 +243,7 @@ pub fn plan_song(notes: &[SungNote], o: &SongOptions) -> Plan {
                 if melisma(&notes[k].syl) {
                     return Vec::new();
                 }
-                let mut on = consonants_at(&notes[k].syl.onset, o.body, 0.8, onset_hz(k));
+                let mut on = consonants_at(&notes[k].syl.onset, o.body, consonant_k(o), onset_hz(k));
                 // a rising nucleus's medial glide ends the onset, so it is done by the beat
                 if let Some(a) = onglide(&notes[k].syl.nucleus.ipa) {
                     on.push(nucleus_part(a, medial_glide(&notes[k].syl), onset_hz(k), &notes[k].syl.nucleus));
@@ -243,7 +252,7 @@ pub fn plan_song(notes: &[SungNote], o: &SongOptions) -> Plan {
             })
             .collect();
         let mut codas: Vec<Vec<Segment>> = (i..=j)
-            .map(|k| if k < j && melisma(&notes[k + 1].syl) { Vec::new() } else { consonants_at(&last_of_chain(notes, k).coda, o.body, 0.8, hz_of(k)) })
+            .map(|k| if k < j && melisma(&notes[k + 1].syl) { Vec::new() } else { consonants_at(&last_of_chain(notes, k).coda, o.body, consonant_k(o), hz_of(k)) })
             .collect();
         // the phrase's last vowel leaves a short breath before the next phrase. The call's last
         // phrase is followed by a rest (callers split phrases at rests), so the breath comes from
@@ -256,7 +265,7 @@ pub fn plan_song(notes: &[SungNote], o: &SongOptions) -> Plan {
         // consonant, so the hold is out of its way
         let fade = if j + 1 < notes.len() {
             let next = &notes[j + 1].syl;
-            let onset = total(&consonants(&next.onset, o.body, 0.8)) + if onglide(&next.nucleus.ipa).is_some() { medial_glide(next) } else { 0.0 };
+            let onset = total(&consonants(&next.onset, o.body, consonant_k(o))) + if onglide(&next.nucleus.ipa).is_some() { medial_glide(next) } else { 0.0 };
             js_min(0.15, js_max(0.0, starts[j + 1] - onset - 0.05 - last_end))
         } else {
             0.15

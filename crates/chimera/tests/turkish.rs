@@ -264,7 +264,7 @@ fn turkish_lyrics_plan_as_a_song() {
     let syl = lyrics_to_syllables("Bugün hava çok güzel.");
     let notes: Vec<SungNote> = syl.iter().enumerate().map(|(i, s)| SungNote { midi: 60.0 + i as f64, beats: 1.0, syl: s.clone() }).collect();
     let bpm = 90.0;
-    let plan = plan_song(&notes, &SongOptions { body: BodyMix::FEMALE, bpm, t0: 0.35, vibrato: 35.0 });
+    let plan = plan_song(&notes, &SongOptions { body: BodyMix::FEMALE, bpm, t0: 0.35, vibrato: 35.0, ..Default::default() });
     assert!(plan.end > 0.35 + notes.len() as f64 * 60.0 / bpm - 0.2, "{}", plan.end);
     assert!(plan.segments.iter().any(|s| s.ipa == "y"));
 }
