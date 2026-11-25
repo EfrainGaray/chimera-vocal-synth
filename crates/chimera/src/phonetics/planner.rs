@@ -324,6 +324,15 @@ const TRILL_STRIKE: f64 = 0.45;
 const TRILL_RAMP: f64 = 0.004;
 const TRILL_SPEED: f64 = 3.5;
 const TRILL_OPEN: f64 = 1.6;
+/// A tap's strike: its gesture starts `TAP_LEAD` s before the segment (the tip needs that long to
+/// travel from a vowel to the ridge) and ends `TAP_CONTACT` s into it, at `TAP_SPEED`. Swept on
+/// kVɾV in six vowel contexts (tests/tap.rs): with no lead the tip never arrived from a low vowel
+/// (-1.6 dB after [ɑ]); with 30 ms it dips 9-18 dB after low and back vowels and closes for
+/// 20-30 ms after [i e], as taps do (a 40 ms contact closed 45 ms there, a stop). The speed made
+/// no difference between 3.5 and 6.
+const TAP_LEAD: f64 = 0.03;
+const TAP_CONTACT: f64 = 0.025;
+const TAP_SPEED: f64 = 3.5;
 
 /// where a trill's articulator is pulled back to between strikes: away from the place by
 /// `TRILL_OPEN` (cm) for the tongue, by an open lip gap for the lips
@@ -496,7 +505,16 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
             Manner::Stop if pre_placed_behind_closure(&segs, i) => add_oral(&def.targets, t0 + js_min(PLACED_CLOSURE_DELAY, js_max(0.0, dur - 0.03)), t1, 1.55, def.ipa),
             Manner::Stop => add_oral(&def.targets, t0 + js_min(stop_closure_delay(def.place, prev_seg), js_max(0.0, dur - 0.03)), t1, 1.55, def.ipa),
             Manner::Nasal => add_oral(&def.targets, t0 + js_min(nasal_closure_delay(def.place), js_max(0.0, dur - 0.03)), t1, 1.55, def.ipa),
-            Manner::Tap => add_oral(&def.targets, t0, t1, 2.8, def.ipa),
+            // a tap is one strike of the trill below (Ladefoged & Maddieson 1996: a single ballistic
+            // contact of 20-30 ms, the voice carrying on through it). As a stop-like gesture with
+            // 30 ms ramps on a 20 ms segment it depended on where the tongue started: from a low
+            // vowel it never reached contact (Spanish "cucaracha" lost its r), from a high one it
+            // sealed for 50-70 ms and the voice stopped (heard as [d]); tests/tap.rs
+            Manner::Tap => {
+                gestures.push(Gesture::new(t0 - TAP_LEAD, t0 + TAP_CONTACT, TRILL_RAMP, TRILL_RAMP, 40.0, artic_targets(&def.targets)).speed(TAP_SPEED).release_hold(TRILL_RAMP).label(def.ipa));
+                // the alveolar F2 locus, as for the other alveolars (`oral_gestures_into`)
+                gestures.push(Gesture::new(t0, t1, 0.05, 0.05, 1.2, Targets::default().with(ArticKey::TbX, 3.2).with(ArticKey::TbY, 7.4)).label(def.ipa));
+            }
             Manner::Trill => {
                 // driven trill: the articulator strikes the place and is pulled back between
                 // strikes, so the voice carries on through it. Each strike is its own short gesture
