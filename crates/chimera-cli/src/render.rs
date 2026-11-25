@@ -282,6 +282,11 @@ pub fn spanish(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     println!("{}", s.shown);
     let file = wav_name(name);
     ctx.write_wav(&file, &s.out)?;
+    if ctx.plan {
+        let plan_file = format!("{name}.plan.json");
+        let json = serde_json::to_string(&s.plan.segments).map_err(|e| e.to_string())?;
+        std::fs::write(&plan_file, json).map_err(|e| format!("{plan_file}: {e}"))?;
+    }
     println!("wrote {file}  {} s", fixed(s.out.len() as f64 / FS, 2));
     Ok(())
 }
