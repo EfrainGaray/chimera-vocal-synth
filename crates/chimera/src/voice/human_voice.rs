@@ -392,9 +392,18 @@ impl HumanVoice {
         self.base_closure = 0.0;
         // Most voices, women's and trained singers' included, leave a small posterior gap between
         // the arytenoids through the closed phase (Södersten & Lindestad 1990). It leaks a little
-        // air and damps the tract, which lifts H1 and the band below 500 Hz.
-        g.chink = (0.008 + 0.03 * s.breathiness) * k2;
-        g.open_quotient = 0.78 - 0.36 * s.tension + body.open_phase;
+        // air and damps the tract, which lifts H1 and the band below 500 Hz, and its leak is what
+        // the aspiration noise rides on. The body gives its size (`HumanBody::chink`): 2.4 mm² for
+        // a man and 1.6 for a woman at the default breathiness (Birkholz, Drechsel & Stone 2019
+        // found 0.3 mm of rest opening, 2.4 mm², the most natural; it was 1.25 mm² for both, and
+        // the voice measured too clean: H1-H2 0.8 dB where read speech has 3-9). Their 4.8 mm² for
+        // a woman, under this network's Re² noise law, drowned her /u/'s formants in breath;
+        // she keeps the man's share of her smaller pulse.
+        g.chink = (body.chink + 0.03 * s.breathiness) * k2;
+        // Open quotient 0.66 for a man at the default tension (0.60 before): a modal male voice sits
+        // at Rd about 1, which is H1-H2 of 3-4 dB (Fant 1995: H1-H2 = -7.6 + 11.1 Rd; Rd 0.5-1.5 in
+        // men's vowels, 1-2 in women's), and read speech measures 3-9 dB where the voice read 1.
+        g.open_quotient = 0.84 - 0.36 * s.tension + body.open_phase;
         // Zhang 2016 (JASA 139, 1493, table II): closed quotient −0.0247 per degree of resting angle, in a 3D
         // model whose 0-4° open 0-10.1 mm². It's secondary there to the folds' thickness (hill-climb log, experiment 32)
         g.open_with_abduction = 0.98;

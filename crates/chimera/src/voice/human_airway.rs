@@ -333,8 +333,14 @@ impl HumanAirway {
         let g = self.noise_gain;
         let mut list = core::mem::take(&mut self.noise_list);
         list.clear();
-        // aspiration: jet from the glottis hits the epilarynx/ventricular region
-        list.push(NoiseSpec::new(self.glottis_port, self.branch_of(self.pharynx, 1), self.branch_of(self.trachea, self.trachea.n as isize - 2), g.glottis).band(3500.0, 300.0));
+        // aspiration: jet from the glottis hits the epilarynx/ventricular region. Its band reaches
+        // 4.2 kHz: the glottal jet's noise is broadband, and the noise in the F3 region and above is
+        // what listeners hear as the breath in a voice (Klatt & Klatt 1990); cut at 3.5 kHz, the
+        // voice had 2-4 dB less energy above 4 kHz than read speech, and at 5-6 kHz 4 dB more. The
+        // jet's dipole noise peaks near its Strouhal frequency, about 2 kHz for a 3 mm jet at 30 m/s,
+        // and below 1 kHz the harmonics mask what little there is; started at 500 Hz, the leak's
+        // noise read as voice under a voiced fricative's constriction (`voiced_fricatives.rs`).
+        list.push(NoiseSpec::new(self.glottis_port, self.branch_of(self.pharynx, 1), self.branch_of(self.trachea, self.trachea.n as isize - 2), g.glottis).band(4200.0, 1000.0));
         // narrowest open point in pharynx+oral (global position index p over concatenated tubes)
         let (n_ph, n_or) = (self.n_ph, self.n_or);
         let mut min_a = f64::INFINITY;

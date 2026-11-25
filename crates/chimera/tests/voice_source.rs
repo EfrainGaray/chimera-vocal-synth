@@ -21,6 +21,22 @@ fn a_pressed_voice_still_closes_abruptly() {
     }
 }
 
+/// A harmonic's power in the output: the largest over ±3 % of its frequency, for the drift.
+fn harmonic(x: &[f32], f: f64) -> f64 {
+    let at = |f: f64| {
+        let n = x.len() as f64;
+        let (mut re, mut im) = (0.0, 0.0);
+        for (i, s) in x.iter().enumerate() {
+            let w = 0.5 - 0.5 * (std::f64::consts::TAU * i as f64 / n).cos();
+            let a = std::f64::consts::TAU * f * i as f64 / 48000.0;
+            re += w * *s as f64 * a.cos();
+            im += w * *s as f64 * a.sin();
+        }
+        re * re + im * im
+    };
+    (0..21).map(|i| at(f * (0.97 + 0.003 * i as f64))).fold(0.0, f64::max)
+}
+
 #[test]
 fn brightness_tilts_the_voice_and_its_default_changes_nothing() {
     // the Bright control: at its default the closure is what tension alone gives; turned up, the
@@ -37,11 +53,21 @@ fn brightness_tilts_the_voice_and_its_default_changes_nothing() {
         for c in out.chunks_mut(128) {
             v.render(c);
         }
-        // mean squared first difference over mean square: rises with the share of high frequencies
+        // the harmonics' power at 2-4 kHz over the first six: the share of high frequencies in the
+        // voice itself. (The mean squared first difference read the aspiration noise too, which
+        // a wider chink and a noise band to 4 kHz made the larger part of the high frequencies.)
         let x = &out[24000..];
-        let d: f64 = x.windows(2).map(|w| ((w[1] - w[0]) as f64).powi(2)).sum();
-        let e: f64 = x.iter().map(|s| (*s as f64).powi(2)).sum();
-        (v.glottis.params.closure_sharpness, 10.0 * (d / e).log10())
+        let f0 = v.glottis.params.f0;
+        let (mut low, mut high) = (0.0, 0.0);
+        for k in 1..=36 {
+            let p = harmonic(x, k as f64 * f0);
+            if k <= 6 {
+                low += p;
+            } else if k >= 18 {
+                high += p;
+            }
+        }
+        (v.glottis.params.closure_sharpness, 10.0 * (high / low).log10())
     };
     let (dark, mid, bright) = (tilt(0.0), tilt(0.25), tilt(1.0));
     assert_eq!(mid.0, default);

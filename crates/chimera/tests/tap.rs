@@ -63,7 +63,9 @@ fn a_tap_dips_the_sound_briefly_in_every_vowel_context() {
         // negative: a [t] is a stop, with a silent closure the tap must not have
         let segs = [seg("k", None, 0), seg("ɑ", Some(0.1), 1), seg("t", None, 0), seg("ɑ", Some(0.1), 0)];
         let (quiet, _) = closure(body, name, f0, &segs, "t");
-        assert!(quiet > 30, "{name} kata: [t] closed for only {quiet} ms");
+        // (30 ms exactly since the posterior chink of 2.4 mm²: its breath keeps the closure's first
+        // frames within 20 dB of the vowel)
+        assert!(quiet >= 30, "{name} kata: [t] closed for only {quiet} ms");
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

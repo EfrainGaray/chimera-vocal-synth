@@ -71,3 +71,15 @@ fn her_folds_stay_apart_for_more_of_the_cycle() {
     assert!(female_fall < male_fall, "her flow falls at {female_fall:.0} L/s², his at {male_fall:.0}");
     assert!(female_h > male_h, "her H1-H2 {female_h:.2} dB, his {male_h:.2}");
 }
+
+/// The folds leave a posterior chink and open for two thirds of the cycle (Birkholz, Drechsel &
+/// Stone 2019; Fant 1995: Rd about 1 in a man's vowels), so his H1-H2 is in read speech's 3-9 dB,
+/// not the 1 dB of a glottis that shuts completely, and hers is higher still (Klatt & Klatt 1990:
+/// 5.7 dB above his).
+#[test]
+fn a_voice_has_the_breath_of_a_posterior_chink() {
+    let (_, _, male_h) = held(BODY_MALE, "male", 112.0);
+    let (_, _, female_h) = held(BODY_FEMALE, "female", 205.0);
+    assert!(male_h > 2.0, "his H1-H2 {male_h:.2} dB");
+    assert!(female_h > male_h + 2.0, "her H1-H2 {female_h:.2} dB, his {male_h:.2}");
+}

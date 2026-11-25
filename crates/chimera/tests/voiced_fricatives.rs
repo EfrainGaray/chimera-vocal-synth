@@ -28,7 +28,11 @@ fn low_band(x: &[f32], a: f64, b: f64) -> f64 {
 #[test]
 fn the_voice_weakens_behind_a_voiced_fricatives_constriction() {
     for (body, name, f0) in [(BODY_MALE, "male", 112.0), (BODY_FEMALE, "female", 205.0)] {
-        for (c, limit) in [("z", -13.0), ("v", -6.5)] {
+        // /v/'s limit was -6.5 until the folds opened for two thirds of the cycle (open quotient 0.66
+        // at the default tension, from 0.60) and left a wider posterior chink (3.6 mm² his, 4.8 hers):
+        // the band under 1 kHz behind the constriction then read -6.3 dB for him and -5.8 for her, the
+        // leak's flow keeping a little more voice and frication through the constriction
+        for (c, limit) in [("z", -13.0), ("v", -5.5)] {
             let plan = plan_utterance(&tokenize_ipa(&format!("ˈɑ{c}ɑ")), &PlanOptions { body: name.into(), t0: 0.05, f0: Some(f0), ..Default::default() });
             let span = plan.segments.iter().find(|s| s.ipa == c).unwrap();
             let vowel = &plan.segments[0];

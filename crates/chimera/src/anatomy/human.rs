@@ -280,11 +280,22 @@ pub struct HumanBody {
     /// loudness (Holmberg et al. 1988, second-hand), about 12 from her 3.5 dB more H1*-H2* (Classen
     /// et al. 1996, by Klatt & Klatt 1990, second-hand). A child's is taken to be a woman's, unsourced.
     pub open_phase: f64,
+    /// the posterior chink: the gap between the arytenoids that stays open through the closed
+    /// phase (cm², before scale², at the default breathiness). Listeners rated a glottis with a
+    /// rest opening of 0.3 mm (a man) about three times as natural as one that shuts completely
+    /// (Birkholz, Drechsel & Stone 2019, 4050 stimuli): 2.4 mm² of chink on their 4 mm posterior
+    /// glottis. Their woman's best, 0.6 mm or 4.8 mm², is too much for this network's noise law:
+    /// her pulse is 0.10 cm² to his 0.17, and from 3 mm² up the leak's breath drowned her /u/'s
+    /// formants (`mandarin_u.rs`) and her voice under a /dʒ/ closure (`affricates.rs`). She keeps
+    /// the same share of her pulse as he does, 1.6 mm². Women's folds leave the larger gap (Södersten & Lindestad
+    /// 1990), which is where their 5.7 dB higher H1-H2 comes from (Klatt & Klatt 1990). A child's is
+    /// taken to be a woman's, unsourced.
+    pub chink: f64,
 }
 
-pub const BODY_MALE: HumanBody = HumanBody { name: "Adult male", scale: 1.0, pharynx: 1.0, tongue_radius: 2.25, lip_width: 4.6, fold_length: 1.0, open_phase: 0.0 };
-pub const BODY_FEMALE: HumanBody = HumanBody { name: "Adult female", scale: 0.9, pharynx: 0.88, tongue_radius: 2.2, lip_width: 4.4, fold_length: 0.67, open_phase: 0.13 };
-pub const BODY_CHILD: HumanBody = HumanBody { name: "Child", scale: 0.74, pharynx: 0.8, tongue_radius: 2.15, lip_width: 4.0, fold_length: 0.35, open_phase: 0.13 };
+pub const BODY_MALE: HumanBody = HumanBody { name: "Adult male", scale: 1.0, pharynx: 1.0, tongue_radius: 2.25, lip_width: 4.6, fold_length: 1.0, open_phase: 0.0, chink: 0.0195 };
+pub const BODY_FEMALE: HumanBody = HumanBody { name: "Adult female", scale: 0.9, pharynx: 0.88, tongue_radius: 2.2, lip_width: 4.4, fold_length: 0.67, open_phase: 0.13, chink: 0.0153 };
+pub const BODY_CHILD: HumanBody = HumanBody { name: "Child", scale: 0.74, pharynx: 0.8, tongue_radius: 2.15, lip_width: 4.0, fold_length: 0.35, open_phase: 0.13, chink: 0.0153 };
 
 /// The three human bodies by their short names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -388,6 +399,7 @@ impl BodyMix {
             lip_width: self.blend(|b| b.body().lip_width),
             fold_length: self.blend(|b| b.body().fold_length),
             open_phase: self.blend(|b| b.body().open_phase),
+            chink: self.blend(|b| b.body().chink),
         }
     }
 }

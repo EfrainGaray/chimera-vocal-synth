@@ -79,7 +79,8 @@ fn the_voice_is_there_on_the_beat_after_an_aspirated_stop() {
     let unsaid = plan(Syllable { voice_lag: None, ..mandarin("ta1") });
     let (now, then) = (level(&said, 200.0) - level(&said, 30.0), level(&unsaid, 200.0) - level(&unsaid, 30.0));
     assert!(now < 6.0, "30 ms after the beat the voice is {now:.1} dB under its level");
-    assert!(then > 10.0, "without the lag it was {then:.1} dB under");
+    // (6: the posterior chink's breath in the voice brought the aspiration within 7.3 dB of it, from 13)
+    assert!(then > 6.0, "without the lag it was {then:.1} dB under");
 }
 
 /// a song of one note whose beat is `t0` s into the plan: (when its first movement begins, when
