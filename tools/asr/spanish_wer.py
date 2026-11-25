@@ -4,9 +4,11 @@ faster-whisper (greedy, language fixed to Spanish, so the same audio gives the s
 word errors. Accents, case and punctuation are ignored (Whisper writes "esta" for "está" as often
 as not).
 
-usage: spanish_wer.py <outdir> [--model large-v3] [--whisper] [--against earlier/wer.json]
+usage: spanish_wer.py <outdir> [--model large-v3] [--whisper[=k=v,...]] [--close-mic=<cm>]
+                      [--against earlier/wer.json]
 
---whisper renders in the whispered voice (`chimera render spanish --whisper`). Writes
+--whisper and --close-mic are passed to `chimera render spanish` (the whispered voice and its
+parameters; a close microphone). Writes
 <outdir>/wer.json and the renders. Set up once with tools/asr/setup.sh. The model is
 faster-whisper's large-v3 by default (multilingual; small.en, the English judge, can't hear
 Spanish); it runs on a CUDA GPU when ctranslate2 sees one, else on the CPU.
@@ -46,30 +48,50 @@ def main():
             i = args.index(flag)
             opt[flag] = args[i + 1]
             del args[i : i + 2]
-    whisper = "--whisper" in args
-    args = [a for a in args if a != "--whisper"]
+    passed = [a for a in args if a.startswith("--whisper") or a.startswith("--close-mic=")]
+    whisper = any(a.startswith("--whisper") for a in passed)
+    args = [a for a in args if a not in passed]
     out = args[0]
     os.makedirs(out, exist_ok=True)
     sentences = [l.strip() for l in open(os.path.join(HERE, "sentences_es.tsv")) if l.strip()]
-    chimera = os.path.join(REPO, "target/release/chimera")
+    chimera = os.environ.get("CHIMERA_BIN", os.path.join(REPO, "target/release/chimera"))
     jobs = [(text, body, os.path.join(out, f"es-{body}-{i + 1:02d}")) for i, text in enumerate(sentences) for body in BODIES]
 
     def render(job):
         text, body, stem = job
-        cmd = [chimera, "render", "spanish", stem, text, body] + (["--whisper"] if whisper else [])
+        cmd = [chimera, "render", "spanish", stem, text, body] + passed
         subprocess.run(cmd, check=True, capture_output=True)
 
     with ThreadPoolExecutor(os.cpu_count()) as pool:
         list(pool.map(render, jobs))
 
+    name = opt.get("--model", "large-v3")
+
+    def load_model(gpu):
+        return WhisperModel(name, device="cuda" if gpu else "cpu", compute_type="float16" if gpu else "int8",
+                            cpu_threads=os.cpu_count(), download_root=CACHE)
+
     gpu = ctranslate2.get_cuda_device_count() > 0
-    model = WhisperModel(opt.get("--model", "large-v3"), device="cuda" if gpu else "cpu",
-                         compute_type="float16" if gpu else "int8", cpu_threads=os.cpu_count(), download_root=CACHE)
+    model = load_model(gpu)
+
+    def transcribe(path):
+        nonlocal model, gpu
+        try:
+            segs, _ = model.transcribe(load16k(path), language="es", beam_size=1, temperature=0.0,
+                                       condition_on_previous_text=False, vad_filter=False)
+            return " ".join(s.text.strip() for s in segs)
+        except RuntimeError as e:
+            # a GPU shared with other work may not have room: the CPU (int8) transcribes nearly alike, slower
+            if not gpu or "out of memory" not in str(e):
+                raise
+            print("GPU out of memory: transcribing on the CPU", file=sys.stderr)
+            gpu = False
+            model = load_model(False)
+            return transcribe(path)
+
     rows, totals = [], {}
     for text, body, stem in jobs:
-        segs, _ = model.transcribe(load16k(stem + ".wav"), language="es", beam_size=1, temperature=0.0,
-                                   condition_on_previous_text=False, vad_filter=False)
-        heard = " ".join(s.text.strip() for s in segs)
+        heard = transcribe(stem + ".wav")
         ref = words(text)
         e = edits(ref, words(heard))
         rows.append({"body": body, "text": text, "heard": heard, "errors": e, "words": len(ref)})
@@ -79,7 +101,7 @@ def main():
             t[1] += len(ref)
     wer = {k: round(100.0 * e / n, 2) for k, (e, n) in totals.items()}
     with open(os.path.join(out, "wer.json"), "w") as f:
-        json.dump({"model": opt.get("--model", "large-v3"), "whisper": whisper, "wer": wer, "sentences": rows}, f, indent=1, ensure_ascii=False)
+        json.dump({"model": opt.get("--model", "large-v3"), "whisper": whisper, "flags": passed, "wer": wer, "sentences": rows}, f, indent=1, ensure_ascii=False)
     for r in rows:
         if r["errors"]:
             print(f"  {r['body']:6s} {r['errors']}/{r['words']}  {r['text']}  →  {r['heard']}")

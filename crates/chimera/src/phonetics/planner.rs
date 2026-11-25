@@ -234,6 +234,10 @@ pub struct PlanOptions {
     /// fit short notes. Speech and live notes leave it unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sung: Option<bool>,
+    /// breathe in, audibly, at the pauses between a speech's sentences ([`plan_phrases`]; a
+    /// whisper's breaths are part of it). Unset: the pauses are silent
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breaths: Option<bool>,
 }
 
 /// JS truthiness of an optional number (`if (s.f0)`: 0 and NaN are false).
@@ -928,12 +932,35 @@ pub struct PhraseInput {
 pub fn plan_phrases(phrases: &[PhraseInput], o: &PlanOptions) -> Plan {
     let mut all = Plan { gestures: Vec::new(), segments: Vec::new(), end: o.t0 };
     let mut t = o.t0;
-    for p in phrases {
+    for (i, p) in phrases.iter().enumerate() {
         let plan = plan_utterance(&p.segments, &PlanOptions { t0: t, intonation: Some(p.intonation.unwrap_or(Intonation::Statement)), ..o.clone() });
         all.gestures.extend_from_slice(&plan.gestures);
         all.segments.extend(plan.segments);
-        t = plan.end + p.pause.unwrap_or(0.25);
+        let pause = p.pause.unwrap_or(0.25);
+        if o.breaths == Some(true) && i + 1 < phrases.len() && pause >= INHALE_MIN_PAUSE {
+            inhale(plan.end, pause, &mut all.gestures);
+        }
+        t = plan.end + pause;
         all.end = plan.end;
     }
     all
+}
+
+/// The shortest pause (s) a speaker breathes in during, and when the breath starts after the
+/// phrase's end and stops before the next one (s). Speakers breathe in at sentence pauses over a
+/// few tenths of a second (Winkworth et al. 1995), the glottis wide open (abduction 0.6 here, about
+/// twice /h/'s). A breath taken that fast pulls harder than a quiet one: -0.5 of the voice's 7.2
+/// cmH₂O, against quiet breathing's 1-2 (at -0.2 the breath was 30 dB under the whisper, barely
+/// there; at -0.5 it is about 20 dB under).
+const INHALE_MIN_PAUSE: f64 = 0.3;
+const INHALE_AFTER: f64 = 0.06;
+const INHALE_BEFORE: f64 = 0.06;
+const INHALE_BREATH: f64 = -0.5;
+const INHALE_ABDUCTION: f64 = 0.6;
+
+/// A breath drawn in through the open glottis over a pause of `pause` s after `end`.
+fn inhale(end: f64, pause: f64, out: &mut Vec<Gesture>) {
+    let (a, b) = (end + INHALE_AFTER, end + pause - INHALE_BEFORE);
+    out.push(Gesture::new(a - 0.02, b + 0.02, 0.05, 0.05, 6.0, one(ControlKey::ABDUCTION, INHALE_ABDUCTION)).label("inhale"));
+    out.push(Gesture::new(a, b, 0.08, 0.08, 1.0, one(ControlKey::BREATH, INHALE_BREATH)).label("inhale"));
 }

@@ -12,6 +12,7 @@ mod wav;
 
 use chimera::anatomy::human::{BODY_CHILD, BODY_FEMALE, BODY_MALE, BodyMix, HumanBody};
 use chimera::phonetics::syllables::Lang;
+use chimera::voice::human_voice::WhisperParams;
 use std::process::ExitCode;
 
 const USAGE: &str = "\
@@ -41,7 +42,9 @@ usage: chimera <command> [args] [--float] [--whisper]
 
 Output names are stems (<out>.wav). --float writes 32-bit float WAVs instead of 16-bit PCM.
 --whisper says render speech, text, turkish, spanish and vowels in the whispered voice (no fold
-vibration: turbulence at an open glottis).
+vibration: turbulence at an open glottis); --whisper=area=0.05,noiseGain=2 sets its WhisperParams
+(the whisper hill climb's knobs, docs/whisper.md). --close-mic=<cm> records any render through a
+cardioid microphone that close to the mouth (its proximity effect lifts the lows, as in ASMR).
 Calibration writes the tables the engine embeds, in crates/chimera/src/phonetics/.";
 
 /// The output rate of every render.
@@ -56,12 +59,40 @@ pub fn repo_path(rel: &str) -> String {
 pub struct Ctx {
     /// write 32-bit float WAVs
     pub float: bool,
-    /// speak in the whispered voice
-    pub whisper: bool,
+    /// speak in the whispered voice, so
+    pub whisper: Option<WhisperParams>,
+    /// record through a cardioid microphone this many cm from the mouth (`--close-mic=<cm>`)
+    pub close_mic: Option<f64>,
+}
+
+/// `key=value,…` (WhisperParams' camelCase fields) over the defaults.
+fn whisper_params(s: &str) -> Result<WhisperParams, String> {
+    let mut m = serde_json::Map::new();
+    for kv in s.split(',').filter(|kv| !kv.is_empty()) {
+        let (k, v) = kv.split_once('=').ok_or_else(|| format!("--whisper: {kv:?} is not key=value"))?;
+        let x: f64 = v.parse().map_err(|_| format!("--whisper: {k}={v} is not a number"))?;
+        m.insert(k.to_string(), serde_json::json!(x));
+    }
+    let keys: Vec<String> = m.keys().cloned().collect();
+    let p: WhisperParams = serde_json::from_value(serde_json::Value::Object(m)).map_err(|e| format!("--whisper: {e}"))?;
+    // serde's default fills unknown keys silently: refuse a typo
+    let known = serde_json::to_value(p).map_err(|e| e.to_string())?;
+    if let Some(k) = keys.iter().find(|k| known.get(k.as_str()).is_none()) {
+        return Err(format!("--whisper: no parameter {k}; have {}", known.as_object().unwrap().keys().cloned().collect::<Vec<_>>().join(", ")));
+    }
+    Ok(p)
 }
 
 impl Ctx {
     pub fn write_wav(&self, path: &str, x: &[f32]) -> Result<(), String> {
+        let near;
+        let x = match self.close_mic {
+            Some(cm) => {
+                near = wav::close_mic(x, FS, cm);
+                &near[..]
+            }
+            None => x,
+        };
         wav::write(path, x, FS as u32, self.float).map_err(|e| format!("{path}: {e}"))
     }
 }
@@ -103,9 +134,16 @@ pub fn arg<'a>(a: &'a [String], i: usize, default: &'a str) -> &'a str {
 
 fn run(args: Vec<String>) -> Result<(), String> {
     let float = args.iter().any(|a| a == "--float");
-    let whisper = args.iter().any(|a| a == "--whisper");
-    let args: Vec<String> = args.into_iter().filter(|a| a != "--float" && a != "--whisper").collect();
-    let ctx = Ctx { float, whisper };
+    let whisper = match args.iter().find(|a| a.as_str() == "--whisper" || a.starts_with("--whisper=")) {
+        None => None,
+        Some(a) => Some(whisper_params(a.strip_prefix("--whisper=").unwrap_or(""))?),
+    };
+    let close_mic = match args.iter().find_map(|a| a.strip_prefix("--close-mic=")) {
+        None => None,
+        Some(cm) => Some(cm.parse::<f64>().ok().filter(|cm| *cm > 0.0).ok_or_else(|| format!("--close-mic={cm}: a distance in cm"))?),
+    };
+    let args: Vec<String> = args.into_iter().filter(|a| a != "--float" && !(a.as_str() == "--whisper" || a.starts_with("--whisper=") || a.starts_with("--close-mic="))).collect();
+    let ctx = Ctx { float, whisper, close_mic };
     let cmd: Vec<&str> = args.iter().take(2).map(String::as_str).collect();
     match cmd.as_slice() {
         ["render", kind, ..] => {

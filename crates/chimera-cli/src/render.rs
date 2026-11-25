@@ -26,7 +26,7 @@ use chimera::phonetics::mandarin::{MandarinLexicon, is_han};
 use chimera::phonetics::syllables::{Lang, lyrics_in, lyrics_to_syllables};
 use chimera::phonetics::{spanish, turkish};
 use chimera::phonetics::{Intonation, Plan, Syllable};
-use chimera::voice::human_voice::{HumanVoice, SCOPE_POINTS, SourcePatch, VoiceTelemetry};
+use chimera::voice::human_voice::{HumanVoice, SCOPE_POINTS, SourcePatch, VoiceTelemetry, WhisperParams};
 use std::io::Read;
 use std::time::Instant;
 
@@ -121,7 +121,8 @@ pub fn speech(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     };
     let mut voice = HumanVoice::new(FS, b, 2);
     voice.set_source(&SourcePatch::f0(f0));
-    if ctx.whisper {
+    if let Some(w) = ctx.whisper {
+        voice.whisper = w;
         voice.set_source(&SourcePatch::whisper());
     }
     let mut marks: Vec<(f64, String)> = Vec::new();
@@ -187,11 +188,11 @@ pub fn say(g: &EnglishG2P, text: &str, body_name: &str) -> Result<Spoken, String
 
 /// Say phrases from any G2P the way `render text` does (see [`say`]).
 pub fn say_phrases(phrases: &[Phrase], body_name: &str) -> Result<Spoken, String> {
-    say_phrases_in(phrases, body_name, false)
+    say_phrases_in(phrases, body_name, None)
 }
 
-/// [`say_phrases`], whispered when `whisper`.
-pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Result<Spoken, String> {
+/// [`say_phrases`], whispered so when `whisper` is given.
+pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: Option<WhisperParams>) -> Result<Spoken, String> {
     let b = body(body_name)?;
     let f0 = text_f0(body_name);
     let shown: Vec<String> = phrases
@@ -211,7 +212,8 @@ pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Res
         .collect();
     let mut voice = HumanVoice::new(FS, b, 2);
     voice.set_source(&SourcePatch::f0(f0));
-    if whisper {
+    if let Some(w) = whisper {
+        voice.whisper = w;
         voice.set_source(&SourcePatch::whisper());
     }
     let inputs: Vec<PhraseInput> = phrases
@@ -228,6 +230,7 @@ pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Res
             body: body_name.into(),
             t0: 0.05,
             f0: Some(f0),
+            breaths: whisper.is_some().then_some(true),
             ..Default::default()
         },
     );
@@ -885,7 +888,8 @@ pub fn vowels(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     };
     let mut voice = HumanVoice::new(FS, b, 2);
     voice.set_source(&SourcePatch::f0(f0));
-    if ctx.whisper {
+    if let Some(w) = ctx.whisper {
+        voice.whisper = w;
         voice.set_source(&SourcePatch::whisper());
     }
     let list = ["i", "e", "ɛ", "æ", "ɑ", "ɔ", "o", "u", "ʌ", "ɝ"];

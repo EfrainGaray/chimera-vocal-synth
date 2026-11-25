@@ -79,6 +79,9 @@ pub struct HumanAirway {
     pub dx_stable: f64,
     /// noise gains (tunable)
     pub noise_gain: NoiseGains,
+    /// the glottal noise source while whispering: its gain over `noise_gain.glottis` and its band
+    /// (low-pass, high-pass Hz); None: the voice's aspiration (3.5 kHz, 300 Hz)
+    pub whisper_noise: Option<(f64, f64, f64)>,
     /// max area change rate (cm²/s, body-scaled): a physiological guard against geometric jumps
     pub max_area_rate: f64,
     /// additional rate per cm² of current area (1/s)
@@ -203,6 +206,7 @@ impl HumanAirway {
             base: None,
             base_dt: 0.0,
             noise_list: Vec::with_capacity(8),
+            whisper_noise: None,
             scratch_frame: HumanFrame::with_capacity(),
         }
     }
@@ -334,7 +338,11 @@ impl HumanAirway {
         let mut list = core::mem::take(&mut self.noise_list);
         list.clear();
         // aspiration: jet from the glottis hits the epilarynx/ventricular region
-        list.push(NoiseSpec::new(self.glottis_port, self.branch_of(self.pharynx, 1), self.branch_of(self.trachea, self.trachea.n as isize - 2), g.glottis).band(3500.0, 300.0));
+        let (gain, lp, hp) = match self.whisper_noise {
+            Some((k, lp, hp)) => (k * g.glottis, lp, hp),
+            None => (g.glottis, 3500.0, 300.0),
+        };
+        list.push(NoiseSpec::new(self.glottis_port, self.branch_of(self.pharynx, 1), self.branch_of(self.trachea, self.trachea.n as isize - 2), gain).band(lp, hp));
         // narrowest open point in pharynx+oral (global position index p over concatenated tubes)
         let (n_ph, n_or) = (self.n_ph, self.n_or);
         let mut min_a = f64::INFINITY;

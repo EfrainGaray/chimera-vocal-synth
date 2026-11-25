@@ -117,6 +117,7 @@ bun tools/musicxml-to-notes.ts score.mxl P1 --out p1.json   # a score's part →
 - [docs/russian.md](docs/russian.md): how Russian text is read, and what is approximate.
 - [docs/turkish.md](docs/turkish.md): how Turkish text is read: k, g and l, ğ, stress.
 - [docs/spanish.md](docs/spanish.md): how Spanish text is read: seseo and yeísmo, b d g, stress, intonation.
+- [docs/whisper.md](docs/whisper.md): the whispered voice: an open glottis's turbulence, tuned against human whispers.
 - [docs/hill-climb/](docs/hill-climb/): the rules and log for tuning the voice one measured
   step at a time.
 - [docs/rig.md](docs/rig.md): the body rig the 3D head can be worn on.

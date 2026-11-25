@@ -194,6 +194,8 @@ export interface PlanOptions {
   /** a sung phrase (planSong sets it): consonants given a pitch hold it, and pitch ramps shrink
    *  to fit short notes */
   sung?: boolean;
+  /** breathe in, audibly, at the pauses between sentences (planPhrases; a whisper does) */
+  breaths?: boolean;
 }
 
 export function planUtterance(segments: Segment[], options: PlanOptions): Plan {

@@ -5,7 +5,7 @@
 use super::human_airway::HumanAirway;
 use crate::airway::decimator::Decimator;
 use crate::anatomy::geom::Vec2;
-use crate::anatomy::human::{ArticKey, ArticPatch, BODY_MALE, HumanBody, N_ARTIC};
+use crate::anatomy::human::{ArticKey, ArticPatch, BODY_MALE, HumanArtic, HumanBody, N_ARTIC};
 use crate::control::articulators::ArticulatorBank;
 use crate::control::score::{Blended, ControlKey, Gesture, GestureScore, Label, N_CONTROL};
 use crate::math::{PI, clamp, exp, js_max, js_min, js_sign, js_trunc_i32, pow, sqrt, tanh};
@@ -50,6 +50,47 @@ fn default_brightness() -> f64 {
 /// its 0.8 (hill-climb log, experiment 30).
 pub const DEFAULT_SOURCE: VoiceSource = VoiceSource { f0: 110.0, glide: 0.06, pressure: 7.2, breathiness: 0.15, tension: 0.5, fry: 0.0, roughness: 0.1, vibrato_depth: 0.0, vibrato_rate: 6.0, drift: 5.0, voiced: true, brightness: 0.25 };
 
+/// The whispered voice (`VoiceSource::voiced` false): no fold vibration, the source is the
+/// turbulence of the air through the open glottis. Each field is a physical quantity, set by the
+/// whisper hill climb against human whispers (docs/whisper.md).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct WhisperParams {
+    /// the static glottal opening (cm², adult male; scaled with the body): the posterior chink
+    /// between the arytenoids, the membranous folds together (an inverted Y; Solomon, McCall,
+    /// Trosset & Gray 1989)
+    pub area: f64,
+    /// more opening per unit of breathiness (cm²): a breathier whisper is wider
+    pub breathy_area: f64,
+    /// the glottal turbulence source's gain over the voice's aspiration, and its band (Hz): the
+    /// jet of a whisper is narrower and faster than an aspiration's
+    pub noise_gain: f64,
+    pub noise_lowpass: f64,
+    pub noise_highpass: f64,
+    /// ventricular-fold narrowing held while whispering, 0..1 (supraglottic compression: Solomon et
+    /// al. 1989; Tsunoda, Niimi & Hirose 1994)
+    pub ventricular: f64,
+    /// lung pressure while whispering, as a multiple of the source's
+    pub pressure: f64,
+    /// Prosody without f0: an accent the score asks for as pitch is said as effort and a raised
+    /// larynx (whisperers raise intensity and formants where they would raise pitch; Higashikawa et
+    /// al. 1996, Heeren & van Heuven 2014). Lung pressure rises as (f0 ratio)^this, the larynx this
+    /// many cm per octave.
+    pub accent_pressure: f64,
+    pub accent_larynx: f64,
+}
+
+/// The whisper hill climb's result (docs/whisper.md): distance to the human whispers D 1.08 and
+/// Whisper's word error rate 8.3 % (microphone at 20 cm), where the folds simply held apart scored
+/// D 3.25 and 70.7 %.
+pub const DEFAULT_WHISPER: WhisperParams = WhisperParams { area: 0.35, breathy_area: 0.08, noise_gain: 6.0, noise_lowpass: 1200.0, noise_highpass: 80.0, ventricular: 1.0, pressure: 1.0, accent_pressure: 2.0, accent_larynx: 0.0 };
+
+impl Default for WhisperParams {
+    fn default() -> Self {
+        DEFAULT_WHISPER
+    }
+}
+
 /// Vocal effort from the lung pressure (cmH₂O). The folds read 0.8 less than the lungs while the
 /// lungs' port took its share, so `(lungs − 3)/10` was this law on the same folds' pressure. The port's fix
 /// moves neither the folds' pressure nor their effort (hill-climb log, experiment 32).
@@ -91,10 +132,10 @@ impl SourcePatch {
     pub fn f0(f0: f64) -> Self {
         SourcePatch { f0: Some(f0), ..Default::default() }
     }
-    /// A whisper: the folds held apart and still, so the only source is the turbulence of the air
-    /// through the open glottis, with a little more lung pressure to make it audible.
+    /// A whisper: the folds still, the only source the turbulence of the air through the open
+    /// glottis ([`WhisperParams`]).
     pub fn whisper() -> Self {
-        SourcePatch { voiced: Some(false), breathiness: Some(0.9), pressure: Some(8.5), ..Default::default() }
+        SourcePatch { voiced: Some(false), ..Default::default() }
     }
     /// `Object.assign(source, patch)`
     pub fn apply(&self, s: &mut VoiceSource) {
@@ -259,6 +300,8 @@ pub struct HumanVoice {
     pub max_penetration: f64,
     /// pitch bend (ratio), on top of whatever sets the pitch
     pub bend: f64,
+    /// how the voice whispers when the source isn't voiced
+    pub whisper: WhisperParams,
 }
 
 /// How many times the airway is oversampled at this output rate: the smallest factor that puts
@@ -324,6 +367,7 @@ impl HumanVoice {
             lim_release: exp(-1.0 / (0.2 * fs_out)),
             max_penetration: 0.1,
             bend: 1.0,
+            whisper: DEFAULT_WHISPER,
         };
         let x = v.artic.x;
         v.airway.apply(&x, 0.0);
@@ -387,7 +431,9 @@ impl HumanVoice {
         // the pulse's peak area is the vibrating fold's length by how far its edge swings
         let body = self.airway.body;
         g.amplitude = 0.17 * body.fold_length * body.scale * (if s.voiced { 1.0 } else { 0.0 });
-        g.abduction = (if s.voiced { 0.1 * s.breathiness * s.breathiness } else { 0.2 + 0.1 * s.breathiness }) * k2;
+        let w = self.whisper;
+        g.abduction = (if s.voiced { 0.1 * s.breathiness * s.breathiness } else { w.area + w.breathy_area * s.breathiness }) * k2;
+        self.airway.whisper_noise = (!s.voiced).then_some((w.noise_gain, w.noise_lowpass, w.noise_highpass));
         self.base_abduction = g.abduction;
         self.base_closure = 0.0;
         // Most voices, women's and trained singers' included, leave a small posterior gap between
@@ -549,11 +595,22 @@ impl HumanVoice {
             self.score_f0 = None;
         }
         self.clock += dt;
+        // whispering: the ventricular folds narrow, and an accent the score asks for as pitch raises
+        // the larynx (and the lungs' pressure, below). Only the airway sees it: the articulators'
+        // own state is the performer's and the score's.
+        let whisper_ratio = if self.source.voiced { 1.0 } else { clamp(f0_target / self.source.f0, 0.5, 2.0) };
+        let w = self.whisper;
+        let whispered = |mut x: HumanArtic| {
+            let v = x.get_mut(ArticKey::Ventricular);
+            *v = js_max(*v, w.ventricular);
+            *x.get_mut(ArticKey::Larynx) += w.accent_larynx * crate::math::log2(whisper_ratio);
+            x
+        };
         // contact constraint on the frame computed anyway; re-apply only if a correction was made
-        let x = self.artic.x;
+        let x = if self.source.voiced { self.artic.x } else { whispered(self.artic.x) };
         self.airway.apply(&x, dt);
         if self.enforce_contacts() {
-            let x = self.artic.x;
+            let x = if self.source.voiced { self.artic.x } else { whispered(self.artic.x) };
             self.airway.reapply(&x);
         }
         self.airway.net.begin_block(self.ctrl_every);
@@ -583,6 +640,9 @@ impl HumanVoice {
         crate::airway::network::tiny(&mut self.lim_env);
         crate::airway::network::tiny(&mut self.lung_flow);
         self.p_lung = self.source.pressure * CM_H2O * self.gate;
+        if !self.source.voiced {
+            self.p_lung *= self.whisper.pressure * pow(whisper_ratio, self.whisper.accent_pressure);
+        }
         if self.p_lung == 0.0 {
             crate::airway::network::tiny(&mut self.p_lung_now);
         }
