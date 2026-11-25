@@ -39,6 +39,8 @@ pub struct GlottisParams {
     pub vibrato_rate: f64,
     /// slow random pitch drift (cents)
     pub drift: f64,
+    /// flutter: three slow sines at 12.7, 7.1 and 4.7 Hz, each this many cents (Klatt & Klatt 1990)
+    pub flutter: f64,
     /// vocal fry 0..1: low-frequency double-pulsing with short open phase
     pub fry: f64,
     /// diplophonia / period doubling 0..1 (alternating amplitude & period)
@@ -65,6 +67,7 @@ pub const DEFAULT_GLOTTIS: GlottisParams = GlottisParams {
     vibrato_depth: 0.0,
     vibrato_rate: 6.0,
     drift: 6.0,
+    flutter: 0.0,
     fry: 0.0,
     diplophonia: 0.0,
     closure: 0.0,
@@ -81,6 +84,8 @@ pub struct ParametricGlottis {
     cycle_index: u64,
     chaos_x: f64,
     vib_phase: f64,
+    /// time (s) for the flutter's sines
+    flutter_t: f64,
     rng: Rng,
     drift: Drift,
     drift_value: f64,
@@ -118,6 +123,7 @@ impl ParametricGlottis {
             cycle_index: 0,
             chaos_x: 0.37,
             vib_phase: 0.0,
+            flutter_t: 0.0,
             rng: Rng::new(777),
             drift: Drift::new(fs / 32.0, 0.3, 4242),
             drift_value: 0.0,
@@ -161,7 +167,14 @@ impl ParametricGlottis {
             if self.vib_phase > 1.0 {
                 self.vib_phase -= 1.0;
             }
-            let cents = p.vibrato_depth * sin(TAU * self.vib_phase) + p.drift * self.drift_value;
+            // flutter: a quasi-random wander of the pitch that a perfectly steady or purely random
+            // pitch lacks; three sines at 12.7, 7.1 and 4.7 Hz (Klatt & Klatt 1990, their FL)
+            self.flutter_t += 32.0 / self.fs;
+            if self.flutter_t > 1000.0 {
+                self.flutter_t -= 1000.0;
+            }
+            let flutter = if p.flutter > 0.0 { p.flutter * (sin(TAU * 12.7 * self.flutter_t) + sin(TAU * 7.1 * self.flutter_t) + sin(TAU * 4.7 * self.flutter_t)) } else { 0.0 };
+            let cents = p.vibrato_depth * sin(TAU * self.vib_phase) + p.drift * self.drift_value + flutter;
             self.pitch_factor = pow(2.0, cents / 1200.0);
         }
         let mut f0 = p.f0 * self.pitch_factor;

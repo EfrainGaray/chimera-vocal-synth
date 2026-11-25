@@ -35,6 +35,9 @@ fn render_flat(segs: &[Segment], body: HumanBody, name: &str, f0: f64) -> Render
 fn render_with(segs: &[Segment], body: HumanBody, name: &str, f0: f64, intonation: Intonation) -> Rendered {
     let mut v = HumanVoice::new(FS, body, 2);
     v.set_source(&SourcePatch::f0(f0));
+    // the harmonic contrast reads peaks within ±12 Hz of k·f0 over an 85 ms window: the flutter
+    // (±26 cents, 50-70 Hz at the 20th harmonic) smears them, so it is off for these measurements
+    v.glottis.params.flutter = 0.0;
     let plan = plan_utterance(segs, &PlanOptions { body: name.into(), t0: 0.05, f0: Some(f0), intonation: Some(intonation), ..Default::default() });
     v.schedule(&plan.gestures);
     let mut out = vec![0.0f32; (FS * (plan.end + 0.3)).round() as usize];
@@ -163,7 +166,9 @@ fn a_palatalized_consonant_starts_its_vowel_with_a_high_f2() {
             assert!(b > a + rise, "{name} /{c}ʲa/: F2 {b:.0} Hz against {a:.0} Hz plain");
             let (a, b) = (plain.f2(on_plain + 0.2), pal.f2(on_pal + 0.2));
             println!("   settled: {a:.0} Hz plain, {b:.0} Hz palatalized");
-            assert!((a - b).abs() < 50.0, "{name} /{c}ʲa/: F2 {b:.0} Hz against {a:.0} Hz plain, 200 ms after the voice sets in");
+            // (75 Hz: the breath of the 2.4 mm² posterior chink scatters the LPC's F2 of the same
+            // vowel by up to 62 Hz between two renders, where it was 27)
+            assert!((a - b).abs() < 75.0, "{name} /{c}ʲa/: F2 {b:.0} Hz against {a:.0} Hz plain, 200 ms after the voice sets in");
         }
     }
 }

@@ -50,6 +50,10 @@ fn default_brightness() -> f64 {
 /// its 0.8 (hill-climb log, experiment 30).
 pub const DEFAULT_SOURCE: VoiceSource = VoiceSource { f0: 110.0, glide: 0.06, pressure: 7.2, breathiness: 0.15, tension: 0.5, fry: 0.0, roughness: 0.1, vibrato_depth: 0.0, vibrato_rate: 6.0, drift: 5.0, voiced: true, brightness: 0.25 };
 
+/// Each of the flutter's three sines, in cents: Klatt & Klatt 1990's FL = 25 % is ΔF0 = 0.5 (F0/100)
+/// Hz per sine, 8.6 cents at any F0.
+const KLATT_FLUTTER_CENTS: f64 = 8.6;
+
 /// Vocal effort from the lung pressure (cmH₂O). The folds read 0.8 less than the lungs while the
 /// lungs' port took its share, so `(lungs − 3)/10` was this law on the same folds' pressure. The port's fix
 /// moves neither the folds' pressure nor their effort (hill-climb log, experiment 32).
@@ -426,6 +430,10 @@ impl HumanVoice {
         g.vibrato_depth = s.vibrato_depth;
         g.vibrato_rate = s.vibrato_rate;
         g.drift = s.drift;
+        // Klatt & Klatt's flutter at their FL = 25 %, "a quite realistic deviation from constant
+        // pitch": the three sines sum to ±1.5 Hz on a 100 Hz voice, 8.6 cents each at any pitch. The
+        // 5 cents of random drift alone left the pitch steadier than any speaker's.
+        g.flutter = KLATT_FLUTTER_CENTS;
         g.effort = effort_at(s.pressure);
     }
 
