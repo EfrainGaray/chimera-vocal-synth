@@ -53,6 +53,10 @@ const PAUSE_SENTENCE: f64 = 0.55;
 /// Klatt's /ɑ/ is the long vowel of "father" (240 ms inherent); Spanish /a/ is barely longer than
 /// /e o/ (Navarro Tomás 1918), so it is brought to about /e/'s length.
 const A_LENGTH: f64 = 0.8;
+/// The approximants [β ɣ] last this many times the inventory's voiced fricative (90 ms): between
+/// vowels they are brief, 45-60 ms (Martínez Celdrán & Fernández Planas 2007), where the rules
+/// gave the read story 85-90 ms. [ð] has its own 50 ms entry.
+const APPROXIMANT_LENGTH: f64 = 0.65;
 
 fn is_vowel_letter(c: char) -> bool {
     "aeiouáéíóúü".contains(c)
@@ -382,7 +386,7 @@ fn segment(ipa: &'static str, vowel: bool, stress: u8, word_end: bool) -> Segmen
         let k = VOWEL_LENGTH * if stress == 0 { UNSTRESSED_LENGTH } else { 1.0 } * if ipa == "ɑ" { A_LENGTH } else { 1.0 };
         (k != 1.0).then_some(k)
     } else {
-        None
+        matches!(ipa, "β" | "ɣ").then_some(APPROXIMANT_LENGTH)
     };
     Segment {
         ipa: ipa.to_string(),

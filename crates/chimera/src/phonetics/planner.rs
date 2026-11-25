@@ -333,6 +333,8 @@ const TRILL_OPEN: f64 = 1.6;
 const TAP_LEAD: f64 = 0.03;
 const TAP_CONTACT: f64 = 0.025;
 const TAP_SPEED: f64 = 3.5;
+/// the lead after an alveolar stop, whose closure already placed the tip
+const TAP_LEAD_PLACED: f64 = 0.005;
 
 /// where a trill's articulator is pulled back to between strikes: away from the place by
 /// `TRILL_OPEN` (cm) for the tongue, by an open lip gap for the lips
@@ -511,7 +513,11 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
             // vowel it never reached contact (Spanish "cucaracha" lost its r), from a high one it
             // sealed for 50-70 ms and the voice stopped (heard as [d]); tests/tap.rs
             Manner::Tap => {
-                gestures.push(Gesture::new(t0 - TAP_LEAD, t0 + TAP_CONTACT, TRILL_RAMP, TRILL_RAMP, 40.0, artic_targets(&def.targets)).speed(TAP_SPEED).release_hold(TRILL_RAMP).label(def.ipa));
+                // after an alveolar stop ("otro", "padre") the tip is already at the ridge: no
+                // travel, and a 30 ms lead would have the strike sit on the stop's release
+                let after_alveolar_stop = prev_seg.and_then(|p| p.def).is_some_and(|d| d.manner == Manner::Stop && d.place == "alveolar");
+                let lead = if after_alveolar_stop { TAP_LEAD_PLACED } else { TAP_LEAD };
+                gestures.push(Gesture::new(t0 - lead, t0 + TAP_CONTACT, TRILL_RAMP, TRILL_RAMP, 40.0, artic_targets(&def.targets)).speed(TAP_SPEED).release_hold(TRILL_RAMP).label(def.ipa));
                 // the alveolar F2 locus, as for the other alveolars (`oral_gestures_into`)
                 gestures.push(Gesture::new(t0, t1, 0.05, 0.05, 1.2, Targets::default().with(ArticKey::TbX, 3.2).with(ArticKey::TbY, 7.4)).label(def.ipa));
             }

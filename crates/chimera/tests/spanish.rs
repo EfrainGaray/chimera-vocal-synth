@@ -354,3 +354,36 @@ fn pauses_at_commas_and_full_stops() {
     // negative: a phrase that goes on pauses less than a sentence's end
     assert!(pauses[0] < pauses[1]);
 }
+
+#[test]
+fn intervocalic_approximants_are_brief() {
+    // "la boca" and "el lago": [β ɣ] 45-60 ms between vowels; [ð] keeps the inventory's own 50 ms
+    let plan = plan_es("La boca del lago abierto.", 110.0);
+    let ms = |ipa: &str| plan.segments.iter().filter(|s| s.ipa == ipa).map(|s| 1000.0 * (s.t1 - s.t0)).fold(0.0, f64::max);
+    eprintln!("β {:.0} ms, ɣ {:.0} ms, ð {:.0} ms", ms("β"), ms("ɣ"), ms("ð"));
+    assert!(ms("β") <= 65.0 && ms("ɣ") <= 65.0, "β {:.0}, ɣ {:.0} ms", ms("β"), ms("ɣ"));
+    assert!(ms("ð") > 35.0 && ms("ð") <= 65.0, "ð {:.0} ms", ms("ð"));
+    // negative: the same segments without their length are the inventory's long fricatives
+    let mut phrases = to_phrases("La boca del lago abierto.");
+    for s in &mut phrases[0].segments {
+        s.length = None;
+    }
+    let inputs = [PhraseInput { segments: phrases[0].segments.clone(), intonation: Some(Intonation::Statement), pause: None, tune: None }];
+    let plain = plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, f0: Some(110.0), ..Default::default() });
+    let long = plain.segments.iter().filter(|s| s.ipa == "β").map(|s| 1000.0 * (s.t1 - s.t0)).fold(0.0, f64::max);
+    assert!(long > 75.0, "untouched β {long:.0} ms");
+}
+
+#[test]
+fn a_tap_after_an_alveolar_stop_strikes_from_the_stop() {
+    // "otro": the tip is at the ridge after [t], so the tap's strike starts with its segment; after
+    // a vowel ("oro") it starts 30 ms early, the tip's travel
+    let strike_lead = |text: &str| {
+        let plan = plan_es(text, 110.0);
+        let tap = plan.segments.iter().find(|s| s.ipa == "ɾ").unwrap();
+        let g = plan.gestures.iter().filter(|g| g.label_str() == "ɾ").map(|g| g.t0).fold(f64::MAX, f64::min);
+        tap.t0 - g
+    };
+    assert!(strike_lead("otro") < 0.01, "otro: lead {:.3}", strike_lead("otro"));
+    assert!(strike_lead("oro") > 0.025, "oro: lead {:.3}", strike_lead("oro"));
+}
