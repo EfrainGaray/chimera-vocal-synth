@@ -204,7 +204,7 @@ fn intonation_by_sentence_type() {
 fn a_continuation_rises_and_a_statement_falls() {
     // the last vowel's pitch target against the phrase's base
     let last_pitch = |text: &str| {
-        let inputs: Vec<PhraseInput> = to_phrases(text).iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause) }).collect();
+        let inputs: Vec<PhraseInput> = to_phrases(text).iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
         let plan = plan_phrases(&inputs[..1], &PlanOptions { body: BodyMix::MALE, f0: Some(100.0), ..Default::default() });
         plan.gestures.iter().filter(|g| g.label_str() == "pitch").map(|g| g.targets.get(chimera::control::score::ControlKey::F0).unwrap()).last().unwrap()
     };
@@ -224,7 +224,7 @@ fn spanish_is_syllable_timed() {
     // the same kind of sentence in both languages: vowel durations vary about half as much in
     // Spanish (Grabe & Low 2002: Spanish 29.7, English 57.2)
     let vowel_durs = |phrases: Vec<chimera::phonetics::english::Phrase>| {
-        let inputs: Vec<PhraseInput> = phrases.iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause) }).collect();
+        let inputs: Vec<PhraseInput> = phrases.iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
         let plan = plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, ..Default::default() });
         plan.segments.iter().filter(|s| s.kind == "vowel").map(|s| s.t1 - s.t0).collect::<Vec<_>>()
     };
@@ -234,7 +234,7 @@ fn spanish_is_syllable_timed() {
     assert!(es < 40.0 && es < 0.75 * en, "Spanish vowel nPVI {es:.1}, English {en:.1}");
     // stressed vowels are longer, but not twice as long
     let segs = to_phrases("pasaba").remove(0).segments;
-    let inputs = [PhraseInput { segments: segs, intonation: Some(Intonation::Flat), pause: None }];
+    let inputs = [PhraseInput { segments: segs, intonation: Some(Intonation::Flat), pause: None, tune: None }];
     let plan = plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, ..Default::default() });
     let v: Vec<_> = plan.segments.iter().filter(|s| s.kind == "vowel").collect();
     let ratio = (v[1].t1 - v[1].t0) / (v[0].t1 - v[0].t0);
@@ -260,4 +260,97 @@ fn lyrics_in_spanish() {
     assert_eq!(si.iter().map(|s| s.nucleus.ipa.as_str()).collect::<Vec<_>>(), ["i", "u̠"]);
     // other scripts still go to their own front ends
     assert_eq!(lyrics_to_syllables("hola 사랑").len(), 4);
+}
+
+const STORY: &str = "En una noche de verano, una pequeña cucaracha salió a caminar por la cocina. Buscaba migas de pan, pero encontró un gato dormido. Con mucho cuidado, pasó por su lado sin hacer ruido.";
+
+fn plan_es(text: &str, f0: f64) -> chimera::phonetics::Plan {
+    let inputs: Vec<PhraseInput> = to_phrases(text).iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
+    plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, f0: Some(f0), ..Default::default() })
+}
+
+/// Mean vowel duration (ms) of the plan's stressed and unstressed vowels.
+fn vowel_means(plan: &chimera::phonetics::Plan) -> (f64, f64) {
+    let mean = |st: u8| {
+        let v: Vec<f64> = plan.segments.iter().filter(|s| s.kind == "vowel" && s.stress == Some(st)).map(|s| 1000.0 * (s.t1 - s.t0)).collect();
+        v.iter().sum::<f64>() / v.len() as f64
+    };
+    (mean(1), mean(0))
+}
+
+#[test]
+fn vowels_are_as_short_as_read_spanish_and_stress_lengthens_them() {
+    // read Spanish: stressed vowels 80-100 ms, unstressed 65-75, 1.2-1.5 times apart (Marín
+    // Gálvez 1995); before this the rules gave 139 and 126 ms, a ratio of 1.1
+    let (stressed, unstressed) = vowel_means(&plan_es(STORY, 110.0));
+    let ratio = stressed / unstressed;
+    eprintln!("story vowels: stressed {stressed:.0} ms, unstressed {unstressed:.0} ms, ratio {ratio:.2}");
+    assert!((90.0..125.0).contains(&stressed), "stressed {stressed:.0} ms");
+    assert!((65.0..100.0).contains(&unstressed), "unstressed {unstressed:.0} ms");
+    assert!((1.2..1.5).contains(&ratio), "stressed/unstressed {ratio:.2}");
+    // negative: the same segments without their Spanish lengths are the English rules' long vowels
+    let mut phrases = to_phrases(STORY);
+    for p in &mut phrases {
+        for s in &mut p.segments {
+            s.length = None;
+        }
+    }
+    let inputs: Vec<PhraseInput> = phrases.iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
+    let (s2, u2) = vowel_means(&plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, f0: Some(110.0), ..Default::default() }));
+    assert!(s2 > 125.0 && u2 > 100.0, "without lengths: {s2:.0} / {u2:.0} ms");
+}
+
+/// The pitch targets (Hz) of the gestures that start inside a planned vowel.
+fn pitch_in(plan: &chimera::phonetics::Plan, seg: &chimera::phonetics::PlannedSegment) -> Vec<f64> {
+    plan.gestures.iter().filter(|g| g.label_str() == "pitch" && g.t0 >= seg.t0 - 1e-9 && g.t0 < seg.t1 - 1e-9).filter_map(|g| g.targets.get(chimera::control::score::ControlKey::F0)).collect()
+}
+
+#[test]
+fn prenuclear_accents_peak_on_the_syllable_after_the_stressed_one() {
+    // "Mañana vamos a la playa": ña is a prenuclear accent. Spanish rises through it and peaks on
+    // na (L+>H*: Face 2002); the planner's default (English) peaks on the stressed vowel itself.
+    let f0 = 100.0;
+    let plan = plan_es("Mañana vamos a la playa.", f0);
+    let v: Vec<_> = plan.segments.iter().filter(|s| s.kind == "vowel").collect();
+    assert_eq!(v[1].stress, Some(1), "{:?}", v.iter().map(|s| (&s.ipa, s.stress)).collect::<Vec<_>>());
+    let on_stressed = pitch_in(&plan, v[1]);
+    let on_next = pitch_in(&plan, v[2]);
+    // the stressed vowel starts at the base and its rise reaches the peak the next vowel holds
+    assert!(on_stressed[0] < f0 * 1.02, "ña starts at {:.1}", on_stressed[0]);
+    let peak = *on_stressed.last().unwrap();
+    assert!(peak > f0 * 1.12, "peak {peak:.1}");
+    assert!((on_next[0] - peak).abs() < 1e-9, "na holds {:.1}, the peak is {peak:.1}", on_next[0]);
+    // negative: with no tune, the peak is on the stressed vowel and the next one is lower
+    let segs = to_phrases("Mañana vamos a la playa.").remove(0).segments;
+    let plain = plan_phrases(&[PhraseInput { segments: segs, intonation: Some(Intonation::Statement), pause: None, tune: None }], &PlanOptions { body: BodyMix::MALE, f0: Some(f0), ..Default::default() });
+    let pv: Vec<_> = plain.segments.iter().filter(|s| s.kind == "vowel").collect();
+    let (a, b) = (pitch_in(&plain, pv[1])[0], pitch_in(&plain, pv[2])[0]);
+    assert!(a > f0 * 1.1 && b < a, "untuned: ña {a:.1}, na {b:.1}");
+}
+
+#[test]
+fn a_statement_declines_and_ends_under_its_base() {
+    let f0 = 100.0;
+    let plan = plan_es("Los niños de la escuela caminaban despacio por la vereda.", f0);
+    let v: Vec<_> = plan.segments.iter().filter(|s| s.kind == "vowel").collect();
+    // unstressed vowels sit on the base, which falls about 20 % over the phrase (the LibriVox
+    // reader falls 3-6 semitones over a short phrase; the planner's default is 10 %)
+    let first_unstressed = pitch_in(&plan, v[0])[0];
+    let late_unstressed = pitch_in(&plan, v[v.len() - 3])[0];
+    assert!(first_unstressed > late_unstressed * 1.12, "base {first_unstressed:.1} → {late_unstressed:.1}");
+    // and the final low is under the base it ends at (about 4 semitones under the start)
+    let last = *pitch_in(&plan, v[v.len() - 1]).last().unwrap();
+    assert!(last < f0 * 0.78 && last < late_unstressed, "final low {last:.1}, base before it {late_unstressed:.1}");
+    // negative: a question ends high
+    let q = plan_es("¿Los niños caminaban despacio por la vereda?", f0);
+    let qv: Vec<_> = q.segments.iter().filter(|s| s.kind == "vowel").collect();
+    assert!(*pitch_in(&q, qv[qv.len() - 1]).last().unwrap() > f0 * 1.3);
+}
+
+#[test]
+fn pauses_at_commas_and_full_stops() {
+    let pauses: Vec<f64> = to_phrases("Hola, amigo. ¿Vienes? Chao").iter().map(|p| p.pause).collect();
+    assert_eq!(pauses, [0.25, 0.55, 0.55, 0.55]);
+    // negative: a phrase that goes on pauses less than a sentence's end
+    assert!(pauses[0] < pauses[1]);
 }

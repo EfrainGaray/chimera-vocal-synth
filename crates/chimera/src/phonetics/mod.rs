@@ -76,6 +76,23 @@ impl Segment {
     }
 }
 
+/// A language's spoken melody, set by its front end on each phrase (unset: the planner's English
+/// defaults). The planner's intonation is pitch targets on vowels, so a tune says how high a
+/// stressed vowel's accent reaches, how far the base pitch falls over the phrase, and where a
+/// prenuclear accent peaks.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tune {
+    /// a stressed vowel's pitch excursion over the base (fraction); the nuclear accent reaches 1.8 times it
+    pub accent: f64,
+    /// the base pitch's fall from the phrase's start to its end (fraction); the final low of a
+    /// statement is 5 % under the base it ends at
+    pub declination: f64,
+    /// prenuclear accents rise through the stressed vowel and peak on the syllable after it
+    /// (Spanish's L+>H*); unset, the peak is on the stressed vowel itself
+    pub late_peak: bool,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Intonation {

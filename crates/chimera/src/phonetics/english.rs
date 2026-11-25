@@ -3,7 +3,7 @@
 //! breaks and intonation.
 
 use super::syllables::WordSource;
-use super::{Intonation, Segment};
+use super::{Intonation, Segment, Tune};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -90,6 +90,9 @@ pub struct Phrase {
     pub pause: f64,
     /// the words said, one per word end in `segments`
     pub words: Vec<String>,
+    /// the language's melody (unset: the planner's defaults)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tune: Option<Tune>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -161,7 +164,7 @@ impl EnglishG2P {
             };
             words.clear();
             if !segs.is_empty() {
-                phrases.push(Phrase { segments: segs, intonation: if q { Intonation::Question } else { Intonation::Statement }, pause, words: said });
+                phrases.push(Phrase { segments: segs, intonation: if q { Intonation::Question } else { Intonation::Statement }, pause, words: said, tune: None });
             }
         };
         for part in &parts {

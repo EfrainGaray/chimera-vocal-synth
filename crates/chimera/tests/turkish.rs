@@ -76,7 +76,7 @@ fn soft_g_lengthens_glides_or_vanishes() {
 #[test]
 fn a_long_vowel_lasts_longer_in_the_plan() {
     let vowel = |text: &str| {
-        let inputs: Vec<PhraseInput> = to_phrases(text).iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause) }).collect();
+        let inputs: Vec<PhraseInput> = to_phrases(text).iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
         let plan = plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, ..Default::default() });
         let a: Vec<f64> = plan.segments.iter().filter(|s| s.ipa == "a").map(|s| s.t1 - s.t0).collect();
         assert_eq!(a.len(), 1, "{text}: one vowel");
@@ -194,7 +194,7 @@ fn every_sound_is_one_the_voice_can_make() {
     for s in phrases.iter().flat_map(|p| &p.segments) {
         assert!(is_vowel(&s.ipa, body) || phoneme(&s.ipa, body).is_some(), "unknown sound {}", s.ipa);
     }
-    let inputs: Vec<PhraseInput> = phrases.iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause) }).collect();
+    let inputs: Vec<PhraseInput> = phrases.iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
     let plan = plan_phrases(&inputs, &PlanOptions { body, ..Default::default() });
     assert!(!plan.gestures.is_empty());
     // every segment planned (no diphthongs in Turkish, so one planned segment each)

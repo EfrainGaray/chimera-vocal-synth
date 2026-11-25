@@ -209,6 +209,18 @@ export interface Phrase {
   /** pause after the phrase (s) */
   pause: number;
   words: string[];
+  /** the language's spoken melody (unset: the planner's defaults) */
+  tune?: Tune;
+}
+
+/** A language's spoken melody (crates/chimera/src/phonetics/mod.rs, `Tune`). */
+export interface Tune {
+  /** a stressed vowel's pitch excursion over the base (fraction) */
+  accent: number;
+  /** the base pitch's fall over the phrase (fraction) */
+  declination: number;
+  /** prenuclear accents peak on the syllable after the stressed one */
+  latePeak: boolean;
 }
 
 export interface Syllable {

@@ -491,7 +491,7 @@ pub fn to_phrases(text: &str) -> Vec<Phrase> {
         } else {
             0.3
         };
-        phrases.push(Phrase { segments: segs, intonation: Intonation::Statement, pause, words: said });
+        phrases.push(Phrase { segments: segs, intonation: Intonation::Statement, pause, words: said, tune: None });
     };
     for part in split_keeping(&normalized, is_phrase_punct) {
         if !part.is_empty() && part.chars().all(is_phrase_punct) {

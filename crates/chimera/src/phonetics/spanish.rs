@@ -27,12 +27,29 @@
 use super::english::{Phrase, is_phrase_punct, split_keeping};
 use super::mandarin::MandarinLexicon;
 use super::syllables::{FrontEnd, Lang, lyrics_in};
-use super::{Intonation, Segment, Syllable};
+use super::{Intonation, Segment, Syllable, Tune};
 
-/// Unstressed vowels last this many times what the duration rules give them: Spanish stressed
-/// vowels are 1.2-1.5 times the unstressed (Marín Gálvez 1995), where Klatt's rules make them about
-/// twice, and Spanish's vowel nPVI is about half English's (Grabe & Low 2002: 29.7 against 57.2).
-const UNSTRESSED_LENGTH: f64 = 1.25;
+/// Spanish vowels last this many times what the duration rules (Klatt's, for English) give them:
+/// read Spanish's vowels average 80-100 ms stressed and 65-75 unstressed (Marín Gálvez 1995;
+/// Navarro Tomás 1916), where the rules gave a read story 139 and 126 ms (measured on the plan).
+const VOWEL_LENGTH: f64 = 0.85;
+/// Unstressed vowels last this many times more: Spanish stressed vowels are 1.2-1.5 times the
+/// unstressed (Marín Gálvez 1995), where Klatt's rules make them about twice, and Spanish's vowel
+/// nPVI is about half English's (Grabe & Low 2002: 29.7 against 57.2). 1.25 brought the ratio down
+/// to 1.1 (stress hardly audible as length); 1.05 leaves it near 1.3.
+const UNSTRESSED_LENGTH: f64 = 1.05;
+/// The melody of a Spanish statement: prenuclear accents rise through the stressed syllable to a
+/// peak on the next one (L+>H*: Face 2002, Hualde 2005 ch. 14), with the peaks stepping down over
+/// the phrase (Prieto, Shih & Nibert 1996), and the nuclear accent peaks early in its syllable and
+/// falls to the final low (Sosa 1999). A LibriVox reader (Cuentos mejicanos, a man) spans 8.9
+/// semitones between his 5th and 95th percentiles and falls 3-6 semitones over a short phrase;
+/// the planner's defaults (accent 0.14, declination 0.1) gave 6.3 semitones and under 1;
+/// 0.18 and 0.2 gave 7.1.
+pub const TUNE: Tune = Tune { accent: 0.2, declination: 0.2, late_peak: true };
+/// Pauses (s) after a phrase that goes on (a comma) and after a sentence. Read Spanish pauses
+/// about 250 ms at a comma and 500-700 ms at a full stop (the LibriVox reader: 560 ms on average).
+const PAUSE_CONTINUATION: f64 = 0.25;
+const PAUSE_SENTENCE: f64 = 0.55;
 /// Klatt's /ɑ/ is the long vowel of "father" (240 ms inherent); Spanish /a/ is barely longer than
 /// /e o/ (Navarro Tomás 1918), so it is brought to about /e/'s length.
 const A_LENGTH: f64 = 0.8;
@@ -362,7 +379,7 @@ fn segments(words: &[Parsed], phrase_initial: bool) -> Vec<Segment> {
 
 fn segment(ipa: &'static str, vowel: bool, stress: u8, word_end: bool) -> Segment {
     let length = if vowel {
-        let k = if stress == 0 { UNSTRESSED_LENGTH } else { 1.0 } * if ipa == "ɑ" { A_LENGTH } else { 1.0 };
+        let k = VOWEL_LENGTH * if stress == 0 { UNSTRESSED_LENGTH } else { 1.0 } * if ipa == "ɑ" { A_LENGTH } else { 1.0 };
         (k != 1.0).then_some(k)
     } else {
         None
@@ -504,7 +521,7 @@ pub fn to_phrases(text: &str) -> Vec<Phrase> {
             } else {
                 Intonation::Continuation
             };
-            let pause = if ends { 0.35 } else { 0.18 };
+            let pause = if ends { PAUSE_SENTENCE } else { PAUSE_CONTINUATION };
             push_phrase(&mut phrases, &ws, intonation, pause);
             sentence_start = ends;
         } else {
@@ -521,7 +538,7 @@ pub fn to_phrases(text: &str) -> Vec<Phrase> {
         }
     }
     if !words.is_empty() {
-        push_phrase(&mut phrases, &words, Intonation::Statement, 0.3);
+        push_phrase(&mut phrases, &words, Intonation::Statement, PAUSE_SENTENCE);
     }
     phrases
 }
@@ -532,7 +549,7 @@ fn push_phrase(phrases: &mut Vec<Phrase>, words: &[String], intonation: Intonati
         return;
     }
     let said = parsed.iter().map(|p| p.typed.iter().map(|c| lower(*c)).collect()).collect();
-    phrases.push(Phrase { segments: segments(&parsed, true), intonation, pause, words: said });
+    phrases.push(Phrase { segments: segments(&parsed, true), intonation, pause, words: said, tune: Some(TUNE) });
 }
 
 // ---------------------------------------------------------------- abbreviations

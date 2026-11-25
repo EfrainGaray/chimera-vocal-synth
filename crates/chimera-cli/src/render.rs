@@ -220,6 +220,7 @@ pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Res
             segments: p.segments.clone(),
             intonation: Some(p.intonation),
             pause: Some(p.pause),
+            tune: p.tune,
         })
         .collect();
     let plan = plan_phrases(

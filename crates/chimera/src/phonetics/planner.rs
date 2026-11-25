@@ -8,7 +8,7 @@
 
 use super::durations::{SegInfo, klatt_durations};
 use super::inventory::{Glottal, Manner, PhonemeDef, Voicing, dental_closure, phoneme};
-use super::{Intonation, Plan, PlannedSegment, Segment};
+use super::{Intonation, Plan, PlannedSegment, Segment, Tune};
 use crate::anatomy::human::{ArticKey, ArticPatch, BodyMix, BodyName};
 use crate::control::score::{ControlKey, Gesture, Targets};
 use crate::math::{js_max, js_min, js_round};
@@ -234,6 +234,10 @@ pub struct PlanOptions {
     /// fit short notes. Speech and live notes leave it unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sung: Option<bool>,
+    /// the language's spoken melody (unset: `accent`, a 10 % declination and peaks on the
+    /// stressed vowels); a phrase's own tune ([`PhraseInput`]) takes precedence
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tune: Option<Tune>,
 }
 
 /// JS truthiness of an optional number (`if (s.f0)`: 0 and NaN are false).
@@ -652,7 +656,12 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
     }
     // ---- intonation: pitch targets on vowels
     let f0 = o.f0.unwrap_or(110.0);
-    let accent = o.accent.unwrap_or(0.14);
+    let accent = o.tune.map_or(o.accent.unwrap_or(0.14), |t| t.accent);
+    let declination = o.tune.map_or(0.1, |t| t.declination);
+    let late_peak = o.tune.is_some_and(|t| t.late_peak);
+    // a statement's final low: under the base pitch the phrase ends at (a tuned language), or
+    // the planner's old fixed low
+    let low = if o.tune.is_some() { f0 * (1.0 - declination) * 0.95 } else { f0 * 0.82 };
     let total = js_max(0.2, end - o.t0);
     // the nuclear accent: the phrase's last primary-stressed vowel, a bigger excursion that falls
     // (statements) into the final low; earlier accents are smaller (a "hat" pattern)
@@ -662,18 +671,21 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
             nuclear = i as isize;
         }
     }
+    // a late peak (Hz) the stressed vowel before handed to this one
+    let mut carried: Option<f64> = None;
     for (n, &i) in v_idx.iter().enumerate() {
         let s = &segs[i];
         let Span { t0, t1 } = times[i];
         // pitch holds through the consonants up to the next vowel (instead of sagging to the base)
         let hold = if n < v_idx.len() - 1 { js_max(t1, times[v_idx[n + 1]].t0 - 0.03) } else { t1 };
+        let peak_here = carried.take();
         let mut target: f64;
         let has_f0 = truthy(s.f0);
         if has_f0 {
             target = s.f0.unwrap();
         } else {
             let prog = (t0 - o.t0) / total;
-            let decl = 1.0 - 0.1 * prog;
+            let decl = 1.0 - declination * prog;
             let is_nuclear = i as isize == nuclear;
             let acc = if s.stress == Some(1) {
                 1.0 + (if is_nuclear { accent * 1.8 } else { accent })
@@ -684,6 +696,20 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
             };
             target = f0 * decl * acc;
             let last = n == v_idx.len() - 1;
+            // a prenuclear accent that peaks late: the pitch rises from the base over the second
+            // half of the stressed vowel and the consonants after it, and the unstressed vowel
+            // next holds the peak (Spanish: Face 2002, Prieto, Shih & Nibert 1996)
+            let next_unstressed = v_idx.get(n + 1).is_some_and(|&k| segs[k].stress != Some(1) && !truthy(segs[k].f0));
+            if late_peak && s.stress == Some(1) && !is_nuclear && next_unstressed {
+                let mid = t0 + 0.5 * (t1 - t0);
+                gestures.push(Gesture::new(t0, mid, 0.06, 0.06, 1.0, one(ControlKey::F0, f0 * decl)).label("pitch"));
+                gestures.push(Gesture::new(mid, hold, js_max(0.06, hold - mid), 0.06, 1.0, one(ControlKey::F0, target)).label("pitch"));
+                carried = Some(target);
+                continue;
+            }
+            if let Some(peak) = peak_here {
+                target = peak;
+            }
             if last && o.intonation == Some(Intonation::Question) {
                 target = f0 * 1.35;
             }
@@ -696,10 +722,10 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
                 if is_nuclear && t1 - t0 > 0.08 {
                     // accent peak early in the vowel, then the fall within it
                     gestures.push(Gesture::new(t0, t0 + 0.35 * (t1 - t0), 0.05, 0.05, 1.0, one(ControlKey::F0, target)).label("pitch"));
-                    gestures.push(Gesture::new(t0 + 0.55 * (t1 - t0), t1, 0.06, 0.06, 1.0, one(ControlKey::F0, f0 * 0.82)).label("pitch"));
+                    gestures.push(Gesture::new(t0 + 0.55 * (t1 - t0), t1, 0.06, 0.06, 1.0, one(ControlKey::F0, low)).label("pitch"));
                     continue;
                 }
-                target = f0 * 0.82;
+                target = low;
             }
         }
         let r = if has_f0 && sung { pitch_ramp(t1 - t0) } else { 0.06 };
@@ -921,6 +947,9 @@ pub struct PhraseInput {
     pub intonation: Option<Intonation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pause: Option<f64>,
+    /// the language's melody (unset: `o.tune`, else the planner's defaults)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tune: Option<Tune>,
 }
 
 /// Plan consecutive phrases (each with its own breath group and intonation) from t0.
@@ -929,7 +958,7 @@ pub fn plan_phrases(phrases: &[PhraseInput], o: &PlanOptions) -> Plan {
     let mut all = Plan { gestures: Vec::new(), segments: Vec::new(), end: o.t0 };
     let mut t = o.t0;
     for p in phrases {
-        let plan = plan_utterance(&p.segments, &PlanOptions { t0: t, intonation: Some(p.intonation.unwrap_or(Intonation::Statement)), ..o.clone() });
+        let plan = plan_utterance(&p.segments, &PlanOptions { t0: t, intonation: Some(p.intonation.unwrap_or(Intonation::Statement)), tune: p.tune.or(o.tune), ..o.clone() });
         all.gestures.extend_from_slice(&plan.gestures);
         all.segments.extend(plan.segments);
         t = plan.end + p.pause.unwrap_or(0.25);

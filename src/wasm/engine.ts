@@ -8,7 +8,7 @@ import { call } from "./chimera.ts";
 import { CREATURE_VISUALS } from "../ui/creatureVisuals.ts";
 import type {
   ArticKey, ArticSpec, BeatPreset, BodyMix, BeatSound, BeatStep, CreatureDef, CreatureTelemetry, DemoSong, Gesture, HumanArtic, HumanBody,
-  HumanFrame, Lang, Phrase, Plan, Segment, SkippedIpa, SungNote, Syllable, VoiceSource, VowelRef,
+  HumanFrame, Lang, Phrase, Plan, Segment, SkippedIpa, SungNote, Syllable, Tune, VoiceSource, VowelRef,
 } from "./types.ts";
 
 export type * from "./types.ts";
@@ -194,6 +194,8 @@ export interface PlanOptions {
   /** a sung phrase (planSong sets it): consonants given a pitch hold it, and pitch ramps shrink
    *  to fit short notes */
   sung?: boolean;
+  /** the language's spoken melody (a phrase's own tune takes precedence) */
+  tune?: Tune;
 }
 
 export function planUtterance(segments: Segment[], options: PlanOptions): Plan {
@@ -205,8 +207,8 @@ export function plannedCounts(ipa: string[]): number[] {
   return call("plannedCounts", { ipa });
 }
 
-export function planPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat" | "continuation"; pause?: number }[], options: PlanOptions): Plan {
-  return call("planPhrases", { phrases: phrases.map((p) => ({ segments: p.segments, intonation: p.intonation, pause: p.pause })), options });
+export function planPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat" | "continuation"; pause?: number; tune?: Tune }[], options: PlanOptions): Plan {
+  return call("planPhrases", { phrases: phrases.map((p) => ({ segments: p.segments, intonation: p.intonation, pause: p.pause, tune: p.tune })), options });
 }
 
 export function planSong(notes: SungNote[], options: { body: BodyMix; bpm: number; t0: number; vibrato: number }): Plan {
