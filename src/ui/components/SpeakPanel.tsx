@@ -160,6 +160,8 @@ function Lines() {
 export function SpeakRight() {
   const body = useStore((s) => s.body);
   const f0 = useStore((s) => s.source.f0);
+  const voiced = useStore((s) => s.source.voiced);
+  const setSource = useStore((s) => s.setSource);
   const start = useStore((s) => s.start);
   // one language for Speak and Sing, kept with Sing's words
   const lang = useSing((s) => s.lang);
@@ -191,7 +193,7 @@ export function SpeakRight() {
       await start();
       // the audio didn't start (the error shows on the bar): speaking would only light Stop
       if (!useStore.getState().started) return;
-      await speakText(text, { ipa, lang, body, rate, f0 });
+      await speakText(text, { ipa, lang, body, rate, f0, whisper: !voiced });
     } finally {
       setBusy(false);
     }
@@ -233,6 +235,12 @@ export function SpeakRight() {
         <Chip on={ipa} onClick={() => setIpa(!ipa)}>
           Text is IPA
         </Chip>
+        {/* the same voice setting as Play's Whisper: folds still, turbulence at the open glottis */}
+        {!inPlugin && (
+          <Chip on={!voiced} onClick={() => setSource({ voiced: !voiced })}>
+            Whisper
+          </Chip>
+        )}
       </ActionBar>
       <Screen className="s-say" label="What to say">
         <div className={`say${inPlugin ? " say-lined" : ""}`}>

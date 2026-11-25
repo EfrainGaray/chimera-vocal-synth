@@ -83,8 +83,9 @@ export function transcribe(phrases: { segments: Segment[]; intonation?: string }
   return phrases.map((p) => p.segments.map((s) => (s.stress === 1 ? "ˈ" : s.stress === 2 ? "ˌ" : "") + s.ipa + (s.wordEnd ? " " : "")).join("").trim() + (p.intonation === "question" ? "?" : "")).join(" | ");
 }
 
-export function speakPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat" | "continuation"; pause?: number; words?: string[] }[], o: { body: BodyMix; rate: number; f0: number }): SpokenPlan {
-  const plan = planPhrases(phrases, { body: o.body, t0: 0, rate: o.rate, f0: o.f0 });
+export function speakPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat" | "continuation"; pause?: number; words?: string[] }[], o: { body: BodyMix; rate: number; f0: number; whisper?: boolean }): SpokenPlan {
+  // a whisper breathes in, audibly, between sentences
+  const plan = planPhrases(phrases, { body: o.body, t0: 0, rate: o.rate, f0: o.f0, breaths: o.whisper || undefined });
   const id = engine.schedule({ gestures: plan.gestures.map((g: Gesture) => ({ ...g, targets: { ...g.targets } })), segments: plan.segments, end: plan.end });
   current = { plan, offset: null, id, transcription: transcribe(phrases), words: wordSpans(phrases, plan) };
   for (const l of listeners) l(current);
@@ -92,7 +93,7 @@ export function speakPhrases(phrases: { segments: Segment[]; intonation?: "state
 }
 
 /** Say text: IPA, or words read as `lang` (English unless said). */
-export async function speakText(text: string, o: { ipa: boolean; lang?: Lang; body: BodyMix; rate: number; f0: number }): Promise<SpokenPlan | null> {
+export async function speakText(text: string, o: { ipa: boolean; lang?: Lang; body: BodyMix; rate: number; f0: number; whisper?: boolean }): Promise<SpokenPlan | null> {
   if (!text.trim()) return null;
   let phrases: Phrase[];
   if (o.ipa) phrases = ipaToPhrases(text);
