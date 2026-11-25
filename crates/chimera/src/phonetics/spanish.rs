@@ -54,7 +54,12 @@ const MONOSYLLABLE_LENGTH: f64 = 0.85;
 /// 0.18 and 0.2 gave 7.1.
 /// 0.35 brings the read story to 8.0 semitones between its 5th and 95th percentiles (6.8 at 0.2 and
 /// at 0.25): the voice realises about half of a planned accent, whatever the pitch ramps (40 or 60 ms).
-pub const TUNE: Tune = Tune { accent: 0.35, declination: 0.2, late_peak: true };
+/// Two Chilean readers (OpenSLR 71, speakers m_8421 and f_8421) saying the same 14 sentences span
+/// 12.0 and 9.8 semitones and fall 3.2 and 2.5 st/s, where 0.35 / 0.2 gave 7.5 and 1.3 (the span
+/// is the same for both bodies: the accent is a fraction of the base pitch). 0.45 / 0.35 gives 10.7
+/// st and 2.5 st/s, between the two readers; the blind duel preferred this melody's chain over the
+/// flat one on both bodies (`lab/chimera-ia/REPORTE.md`, round 12).
+pub const TUNE: Tune = Tune { accent: 0.45, declination: 0.35, late_peak: true };
 /// Pauses (s) after a phrase that goes on (a comma) and after a sentence. Read Spanish pauses
 /// about 250 ms at a comma and 500-700 ms at a full stop (the LibriVox reader: 560 ms on average).
 const PAUSE_CONTINUATION: f64 = 0.25;

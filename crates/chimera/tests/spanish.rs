@@ -210,8 +210,9 @@ fn an_explicit_accent_overrides_the_languages_tune() {
         let f0: Vec<f64> = plan.gestures.iter().filter(|g| g.label_str() == "pitch").filter_map(|g| g.targets.get(chimera::control::score::ControlKey::F0)).collect();
         f0.iter().cloned().fold(f64::MIN, f64::max) - f0.iter().cloned().fold(f64::MAX, f64::min)
     };
-    let (tuned, wide, flat) = (span(None), span(Some(0.7)), span(Some(0.05)));
-    assert!(wide > tuned * 1.3, "accent 0.7 should widen the melody: {wide} vs {tuned}");
+    // (the span also holds the tune's declination, so a widening accent has to clear 0.45 by a margin)
+    let (tuned, wide, flat) = (span(None), span(Some(0.9)), span(Some(0.05)));
+    assert!(wide > tuned * 1.3, "accent 0.9 should widen the melody: {wide} vs {tuned}");
     assert!(flat < tuned * 0.7, "accent 0.05 should flatten it: {flat} vs {tuned}");
 }
 
