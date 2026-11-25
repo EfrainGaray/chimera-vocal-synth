@@ -1,6 +1,7 @@
 //! `chimera render …`: ports of `tools/render-{speech,text,song,beatbox,creature,vowels}.ts`.
 
 use crate::js::{fixed, num, pad_end, pad_start};
+use crate::tune::Tune;
 use crate::{Ctx, FS, arg, body, body_mix, peak, repo_path, wav_name};
 use chimera::analysis::lpc::{FormantOpts, estimate_formants};
 use chimera::anatomy::human::{ArticKey, BodyMix, N_ARTIC};
@@ -192,8 +193,14 @@ pub fn say_phrases(phrases: &[Phrase], body_name: &str) -> Result<Spoken, String
 
 /// [`say_phrases`], whispered when `whisper`.
 pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Result<Spoken, String> {
-    let b = body(body_name)?;
-    let f0 = text_f0(body_name);
+    say_phrases_tuned(phrases, body_name, whisper, &Tune::default())
+}
+
+/// [`say_phrases_in`] with `--tune` overrides: the body's fields, the source after the whisper
+/// patch (so `source.f0` moves both the folds and the plan), `plan.accent` and `plan.rate`.
+pub fn say_phrases_tuned(phrases: &[Phrase], body_name: &str, whisper: bool, tune: &Tune) -> Result<Spoken, String> {
+    let b = tune.body(body(body_name)?);
+    let f0 = tune.get("source.f0").unwrap_or(text_f0(body_name));
     let shown: Vec<String> = phrases
         .iter()
         .map(|p| {
@@ -214,6 +221,7 @@ pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Res
     if whisper {
         voice.set_source(&SourcePatch::whisper());
     }
+    voice.set_source(&tune.source());
     let inputs: Vec<PhraseInput> = phrases
         .iter()
         .map(|p| PhraseInput {
@@ -229,6 +237,8 @@ pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Res
             body: body_name.into(),
             t0: 0.05,
             f0: Some(f0),
+            accent: tune.get("plan.accent"),
+            rate: tune.get("plan.rate"),
             ..Default::default()
         },
     );
@@ -246,7 +256,7 @@ pub fn text(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     let body_name = arg(a, 2, "male");
     let g = g2p()?;
     let t = Instant::now();
-    let s = say_phrases_in(&g.to_phrases(text), body_name, ctx.whisper)?;
+    let s = say_phrases_tuned(&g.to_phrases(text), body_name, ctx.whisper, &ctx.tune)?;
     let ms = ms_since(t);
     println!("{}", s.shown);
     let file = wav_name(name);
@@ -265,7 +275,7 @@ pub fn turkish(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     let name = arg(a, 0, "out/turkish");
     let text = arg(a, 1, "Merhaba, nasılsın?");
     let body_name = arg(a, 2, "male");
-    let s = say_phrases_in(&turkish::to_phrases(text), body_name, ctx.whisper)?;
+    let s = say_phrases_tuned(&turkish::to_phrases(text), body_name, ctx.whisper, &ctx.tune)?;
     println!("{}", s.shown);
     let file = wav_name(name);
     ctx.write_wav(&file, &s.out)?;
@@ -279,7 +289,7 @@ pub fn spanish(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     let name = arg(a, 0, "out/spanish");
     let text = arg(a, 1, "Hola, ¿cómo estás?");
     let body_name = arg(a, 2, "male");
-    let s = say_phrases_in(&spanish::to_phrases(text), body_name, ctx.whisper)?;
+    let s = say_phrases_tuned(&spanish::to_phrases(text), body_name, ctx.whisper, &ctx.tune)?;
     println!("{}", s.shown);
     let file = wav_name(name);
     ctx.write_wav(&file, &s.out)?;
@@ -591,11 +601,11 @@ pub fn notes(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     let input = a.first().ok_or("render notes <in.json> <out> [male|female|child] [--artic tracks.json] [--tele voice.tele]")?;
     let out_name = wav_name(arg(a, 1, "out/notes"));
     let body_name = arg(a, 2, "male");
-    let b = body(body_name)?;
+    let b = ctx.tune.body(body(body_name)?);
     let text = std::fs::read_to_string(input).map_err(|e| format!("{input}: {e}"))?;
     let j: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("{input}: {e}"))?;
     let bpm = j["bpm"].as_f64().ok_or("bpm missing")?;
-    let vibrato = j["vibrato"].as_f64().unwrap_or(35.0);
+    let vibrato = ctx.tune.get("song.vibrato").unwrap_or(j["vibrato"].as_f64().unwrap_or(35.0));
     let raw: Vec<[f64; 2]> = serde_json::from_value(j["notes"].clone()).map_err(|e| format!("notes: {e}"))?;
     // "syllables" sing what a language front end wrote; otherwise the lyrics go through the front
     // ends, Latin script read as "lang" ("en", the default, "tr" or "es")
@@ -624,6 +634,7 @@ pub fn notes(ctx: &Ctx, a: &[String]) -> Result<(), String> {
         tension: Some(0.55),
         ..Default::default()
     });
+    v.set_source(&SourcePatch { f0: None, ..ctx.tune.source() });
     let (mut t, mut k, mut end) = (t0, 0usize, 0.0f64);
     let mut phrase: Vec<SungNote> = Vec::new();
     let mut start = t;

@@ -8,6 +8,7 @@ mod compare;
 mod diagnose;
 mod js;
 mod render;
+mod tune;
 mod wav;
 
 use chimera::anatomy::human::{BODY_CHILD, BODY_FEMALE, BODY_MALE, BodyMix, HumanBody};
@@ -15,7 +16,7 @@ use chimera::phonetics::syllables::Lang;
 use std::process::ExitCode;
 
 const USAGE: &str = "\
-usage: chimera <command> [args] [--float] [--whisper] [--plan]
+usage: chimera <command> [args] [--float] [--whisper] [--plan] [--tune k=v,…]
 
   render speech  <out> [\"ipa / ipa\"] [male|female|child]
   render text    <out> [\"English text.\"] [male|female|child]
@@ -61,6 +62,8 @@ pub struct Ctx {
     pub whisper: bool,
     /// `render spanish` also writes the planned segments (`<out>.plan.json`)
     pub plan: bool,
+    /// `--tune k=v,…` overrides (see `tune.rs`)
+    pub tune: tune::Tune,
 }
 
 impl Ctx {
@@ -108,8 +111,18 @@ fn run(args: Vec<String>) -> Result<(), String> {
     let float = args.iter().any(|a| a == "--float");
     let whisper = args.iter().any(|a| a == "--whisper");
     let plan = args.iter().any(|a| a == "--plan");
-    let args: Vec<String> = args.into_iter().filter(|a| a != "--float" && a != "--whisper" && a != "--plan").collect();
-    let ctx = Ctx { float, whisper, plan };
+    let mut tune = tune::Tune::default();
+    let mut rest = Vec::new();
+    let mut it = args.into_iter().filter(|a| a != "--float" && a != "--whisper" && a != "--plan");
+    while let Some(a) = it.next() {
+        if a == "--tune" {
+            tune = tune::Tune::parse(&it.next().ok_or("--tune needs key=value,…")?)?;
+        } else {
+            rest.push(a);
+        }
+    }
+    let args = rest;
+    let ctx = Ctx { float, whisper, plan, tune };
     let cmd: Vec<&str> = args.iter().take(2).map(String::as_str).collect();
     match cmd.as_slice() {
         ["render", kind, ..] => {
