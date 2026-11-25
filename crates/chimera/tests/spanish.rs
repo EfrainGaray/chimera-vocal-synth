@@ -331,6 +331,24 @@ fn vowels_are_as_short_as_read_spanish_and_stress_lengthens_them() {
     assert!(s2 > 125.0 && u2 > 100.0, "without lengths: {s2:.0} / {u2:.0} ms");
 }
 
+#[test]
+fn a_stressed_monosyllable_is_no_longer_than_a_polysyllables_stressed_syllable() {
+    // Spanish is syllable-timed: a Chilean reader's "pan" lasts what a syllable of "casa" does, where
+    // Klatt's rules spared the monosyllable the polysyllabic and non-word-final shortenings (twice as long)
+    let text = "El pan y la casa de mi madre.";
+    let stressed_vowels = |plan: &chimera::phonetics::Plan| -> Vec<f64> { plan.segments.iter().filter(|s| s.kind == "vowel" && s.stress == Some(1)).map(|s| 1000.0 * (s.t1 - s.t0)).collect() };
+    let v = stressed_vowels(&plan_es(text, 110.0));
+    let (pan, casa) = (v[0], v[1]);
+    eprintln!("pan {pan:.0} ms, casa {casa:.0} ms");
+    assert!(pan <= 1.1 * casa && pan >= 0.8 * casa, "pan {pan:.0} ms against casa's {casa:.0}");
+    // negative: without its Spanish length the monosyllable's vowel is the rules' long one
+    let mut phrases = to_phrases(text);
+    phrases[0].segments.iter_mut().filter(|s| s.stress == Some(1)).next().unwrap().length = None;
+    let inputs: Vec<PhraseInput> = phrases.iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
+    let v2 = stressed_vowels(&plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, f0: Some(110.0), ..Default::default() }));
+    assert!(v2[0] > 1.4 * casa, "without its length: pan {:.0} ms", v2[0]);
+}
+
 /// The pitch targets (Hz) of the gestures that start inside a planned vowel.
 fn pitch_in(plan: &chimera::phonetics::Plan, seg: &chimera::phonetics::PlannedSegment) -> Vec<f64> {
     plan.gestures.iter().filter(|g| g.label_str() == "pitch" && g.t0 >= seg.t0 - 1e-9 && g.t0 < seg.t1 - 1e-9).filter_map(|g| g.targets.get(chimera::control::score::ControlKey::F0)).collect()

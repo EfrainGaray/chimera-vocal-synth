@@ -38,6 +38,13 @@ const VOWEL_LENGTH: f64 = 0.85;
 /// nPVI is about half English's (Grabe & Low 2002: 29.7 against 57.2). 1.25 brought the ratio down
 /// to 1.1 (stress hardly audible as length); 1.05 leaves it near 1.3.
 const UNSTRESSED_LENGTH: f64 = 1.05;
+/// A stressed one-syllable word's vowel ("no", "ser", "pan") lasts this many times what the rules
+/// give it. Klatt's rules shorten a stressed vowel for being non-word-final (0.85) and for being in
+/// a polysyllable (0.8), so a monosyllable escapes both: "pan" ran 135 ms against 120 for the stressed
+/// /a/ of "casa" in the same phrase. Spanish is syllable-timed: a stressed syllable lasts about the
+/// same whatever the word's length (a Chilean reader, OpenSLR 71: 160 ms a monosyllable, 125-175 a
+/// syllable of longer words). 0.85 puts "pan" at 115 ms.
+const MONOSYLLABLE_LENGTH: f64 = 0.85;
 /// The melody of a Spanish statement: prenuclear accents rise through the stressed syllable to a
 /// peak on the next one (L+>H*: Face 2002, Hualde 2005 ch. 14), with the peaks stepping down over
 /// the phrase (Prieto, Shih & Nibert 1996), and the nuclear accent peaks early in its syllable and
@@ -376,16 +383,20 @@ fn segments(words: &[Parsed], phrase_initial: bool) -> Vec<Segment> {
     for w in words {
         for (i, p) in w.phones.iter().enumerate() {
             let syl = w.starts.iter().rposition(|&s| s <= i).unwrap_or(0);
-            out.push(segment(ipa[k], p.vowel, w.stress.get(syl).copied().unwrap_or(0), i + 1 == w.phones.len()));
+            let stress = w.stress.get(syl).copied().unwrap_or(0);
+            out.push(segment(ipa[k], p.vowel, stress, w.starts.len() == 1 && stress > 0, i + 1 == w.phones.len()));
             k += 1;
         }
     }
     out
 }
 
-fn segment(ipa: &'static str, vowel: bool, stress: u8, word_end: bool) -> Segment {
+fn segment(ipa: &'static str, vowel: bool, stress: u8, stressed_monosyllable: bool, word_end: bool) -> Segment {
     let length = if vowel {
-        let k = VOWEL_LENGTH * if stress == 0 { UNSTRESSED_LENGTH } else { 1.0 } * if ipa == "ɑ" { A_LENGTH } else { 1.0 };
+        let k = VOWEL_LENGTH
+            * if stress == 0 { UNSTRESSED_LENGTH } else { 1.0 }
+            * if stressed_monosyllable { MONOSYLLABLE_LENGTH } else { 1.0 }
+            * if ipa == "ɑ" { A_LENGTH } else { 1.0 };
         (k != 1.0).then_some(k)
     } else {
         matches!(ipa, "β" | "ɣ").then_some(APPROXIMANT_LENGTH)
@@ -446,7 +457,7 @@ fn sung_syllables(typed: &str, after: Option<&str>) -> Vec<Syllable> {
     for (i, ph) in p.phones.iter().enumerate() {
         let k = p.starts.iter().rposition(|&s| s <= i).unwrap_or(0);
         // a note sets its own lengths
-        let seg = Segment { length: None, word_end: None, ..segment(ipa[i], ph.vowel, p.stress[k], false) };
+        let seg = Segment { length: None, word_end: None, ..segment(ipa[i], ph.vowel, p.stress[k], false, false) };
         if ph.vowel {
             out[k].nucleus = seg;
         } else if out[k].nucleus.ipa.is_empty() {
