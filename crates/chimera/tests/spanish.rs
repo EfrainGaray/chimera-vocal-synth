@@ -200,6 +200,32 @@ fn intonation_by_sentence_type() {
     assert_eq!(intonations("Compré peras, uvas, manzanas y naranjas."), [Continuation, Continuation, Statement]);
 }
 
+/// `--tune plan.accent` on Spanish text did nothing: the planner read the accent from the
+/// language's tune whenever one was set, so a sweep of the melody never moved it.
+#[test]
+fn an_explicit_accent_overrides_the_languages_tune() {
+    let inputs = inputs_es("Una pequeña cucaracha salió a caminar.");
+    let span = |accent: Option<f64>| {
+        let plan = plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, f0: Some(100.0), accent, ..Default::default() });
+        let f0: Vec<f64> = plan.gestures.iter().filter(|g| g.label_str() == "pitch").filter_map(|g| g.targets.get(chimera::control::score::ControlKey::F0)).collect();
+        f0.iter().cloned().fold(f64::MIN, f64::max) - f0.iter().cloned().fold(f64::MAX, f64::min)
+    };
+    let (tuned, wide, flat) = (span(None), span(Some(0.7)), span(Some(0.05)));
+    assert!(wide > tuned * 1.3, "accent 0.7 should widen the melody: {wide} vs {tuned}");
+    assert!(flat < tuned * 0.7, "accent 0.05 should flatten it: {flat} vs {tuned}");
+}
+
+/// A Chilean reader (OpenSLR 71) says function words in 100 ms a syllable where the rules gave
+/// 180: `plan.unstressed` shortens the unstressed vowels alone, the stressed ones stay.
+#[test]
+fn unstressed_scales_the_unstressed_vowels_only() {
+    let inputs = inputs_es("Una pequeña cucaracha salió a caminar.");
+    let means = |unstressed: Option<f64>| vowel_means(&plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, f0: Some(110.0), unstressed, ..Default::default() }));
+    let ((s1, u1), (s2, u2)) = (means(None), means(Some(0.7)));
+    assert!((s2 - s1).abs() < 1e-9, "stressed vowels moved: {s1} -> {s2}");
+    assert!((u2 / u1 - 0.7).abs() < 0.02, "unstressed vowels should scale by 0.7: {u1} -> {u2}");
+}
+
 #[test]
 fn a_continuation_rises_and_a_statement_falls() {
     // the last vowel's pitch target against the phrase's base
@@ -266,9 +292,12 @@ fn lyrics_in_spanish() {
 
 const STORY: &str = "En una noche de verano, una pequeña cucaracha salió a caminar por la cocina. Buscaba migas de pan, pero encontró un gato dormido. Con mucho cuidado, pasó por su lado sin hacer ruido.";
 
+fn inputs_es(text: &str) -> Vec<PhraseInput> {
+    to_phrases(text).iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect()
+}
+
 fn plan_es(text: &str, f0: f64) -> chimera::phonetics::Plan {
-    let inputs: Vec<PhraseInput> = to_phrases(text).iter().map(|p| PhraseInput { segments: p.segments.clone(), intonation: Some(p.intonation), pause: Some(p.pause), tune: p.tune }).collect();
-    plan_phrases(&inputs, &PlanOptions { body: BodyMix::MALE, f0: Some(f0), ..Default::default() })
+    plan_phrases(&inputs_es(text), &PlanOptions { body: BodyMix::MALE, f0: Some(f0), ..Default::default() })
 }
 
 /// Mean vowel duration (ms) of the plan's stressed and unstressed vowels.

@@ -218,15 +218,22 @@ pub struct PlanOptions {
     /// speaking-rate multiplier (>1 = faster)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate: Option<f64>,
+    /// the unstressed vowels' duration, as a multiple of what the rules give (a reader's
+    /// reduction of function words and weak syllables); None: 1
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unstressed: Option<f64>,
     /// baseline pitch (Hz)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub f0: Option<f64>,
     /// "statement" (final fall) or "question" (final rise)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intonation: Option<Intonation>,
-    /// pitch excursion for stressed syllables (fraction)
+    /// pitch excursion for stressed syllables (fraction); set, it overrides the language's `tune`
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accent: Option<f64>,
+    /// the base pitch's fall over the phrase (fraction); set, it overrides the language's `tune`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declination: Option<f64>,
     /// the last segment is held open-ended (a sung note): no end-of-breath release
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub open_end: Option<bool>,
@@ -410,6 +417,7 @@ pub fn plan_utterance(input: &[Segment], o: &PlanOptions) -> Plan {
 /// given, the timeline to `planned` (which allocates, for its strings).
 pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOptions, gestures: &mut Vec<Gesture>, mut planned: Option<&mut Vec<PlannedSegment>>) -> Timing {
     let rate = o.rate.unwrap_or(1.0);
+    let unstressed = o.unstressed.unwrap_or(1.0);
     let body = o.body;
     // what this call adds, for the speaking rate's shortening below
     let first_gesture = gestures.len();
@@ -455,7 +463,8 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
     let mut t = o.t0 + 0.06; // breath onset lead
     let mut times: SmallVec<[Span; INLINE_SEGMENTS]> = SmallVec::new();
     for s in &segs {
-        let d = s.dur / rate;
+        let weak = s.vowel.is_some() && s.stress.unwrap_or(0) == 0;
+        let d = s.dur / rate * if weak { unstressed } else { 1.0 };
         times.push(Span { t0: t, t1: t + d });
         t += d;
     }
@@ -694,8 +703,9 @@ pub fn plan_timed<'a>(input: impl Iterator<Item = TimedSegment<'a>>, o: &PlanOpt
     }
     // ---- intonation: pitch targets on vowels
     let f0 = o.f0.unwrap_or(110.0);
-    let accent = o.tune.map_or(o.accent.unwrap_or(0.14), |t| t.accent);
-    let declination = o.tune.map_or(0.1, |t| t.declination);
+    // an explicit option wins over the language's tune (`--tune plan.accent` on Spanish text)
+    let accent = o.accent.unwrap_or_else(|| o.tune.map_or(0.14, |t| t.accent));
+    let declination = o.declination.unwrap_or_else(|| o.tune.map_or(0.1, |t| t.declination));
     let late_peak = o.tune.is_some_and(|t| t.late_peak);
     // a statement's final low: under the base pitch the phrase ends at (a tuned language), or
     // the planner's old fixed low

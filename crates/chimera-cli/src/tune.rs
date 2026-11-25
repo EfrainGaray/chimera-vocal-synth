@@ -2,7 +2,7 @@
 //! `source.<field>` (any numeric [`VoiceSource`] field: `breathiness`, `tension`, `roughness`,
 //! `brightness`, `pressure`, `drift`, `glide`, `fry`, `vibrato_depth`, `vibrato_rate`, `f0`),
 //! `body.<field>` (`chink` cm², `open_phase`, `scale`, `pharynx`, `fold_length`, `tongue_radius`,
-//! `lip_width`), `plan.accent`, `plan.rate` (speech), `song.vibrato` (cents) and `song.consonants` (the sung
+//! `lip_width`), `plan.accent`, `plan.declination` (both override the language's melody), `plan.rate`, `plan.unstressed` (the unstressed vowels' length, speech), `song.vibrato` (cents) and `song.consonants` (the sung
 //! consonants' length as a multiple of the spoken one, 0.8) (`render notes`).
 
 use chimera::anatomy::human::HumanBody;
@@ -70,7 +70,7 @@ const KEYS: &[&str] = &[
     "source.f0", "source.glide", "source.pressure", "source.breathiness", "source.tension", "source.fry",
     "source.roughness", "source.vibrato_depth", "source.vibrato_rate", "source.drift", "source.brightness",
     "body.scale", "body.pharynx", "body.tongue_radius", "body.lip_width", "body.fold_length", "body.open_phase",
-    "body.chink", "body.wall_loss", "body.viscous", "body.radiation", "plan.accent", "plan.rate", "song.vibrato", "song.consonants",
+    "body.chink", "body.wall_loss", "body.viscous", "body.radiation", "plan.accent", "plan.declination", "plan.rate", "plan.unstressed", "song.vibrato", "song.consonants",
 ];
 
 #[cfg(test)]

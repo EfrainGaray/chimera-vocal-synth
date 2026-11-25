@@ -197,7 +197,7 @@ pub fn say_phrases_in(phrases: &[Phrase], body_name: &str, whisper: bool) -> Res
 }
 
 /// [`say_phrases_in`] with `--tune` overrides: the body's fields, the source after the whisper
-/// patch (so `source.f0` moves both the folds and the plan), `plan.accent` and `plan.rate`.
+/// patch (so `source.f0` moves both the folds and the plan), `plan.accent`, `plan.declination`, `plan.rate` and `plan.unstressed`.
 pub fn say_phrases_tuned(phrases: &[Phrase], body_name: &str, whisper: bool, tune: &Tune) -> Result<Spoken, String> {
     let b = tune.body(body(body_name)?);
     let f0 = tune.get("source.f0").unwrap_or(text_f0(body_name));
@@ -238,7 +238,9 @@ pub fn say_phrases_tuned(phrases: &[Phrase], body_name: &str, whisper: bool, tun
             t0: 0.05,
             f0: Some(f0),
             accent: tune.get("plan.accent"),
+            declination: tune.get("plan.declination"),
             rate: tune.get("plan.rate"),
+            unstressed: tune.get("plan.unstressed"),
             ..Default::default()
         },
     );
